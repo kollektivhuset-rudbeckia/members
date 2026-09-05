@@ -115,7 +115,7 @@ contacts:
 # Lämna tomt för att stänga av kalkylarksynken.
 # --------------------------------------------------------------------------
 sheet:
-  id: ""
+  id: "1AvB1fkdGca2outMGUSHRVBMGq4bq9lJ2qxxy-zvBZzM"
   tab: Medlemmar
   # Så här många år tillbaka får en egen kolumn med inbetalda kronor.
   years: 5
