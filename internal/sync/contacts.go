@@ -28,6 +28,24 @@ func (s *Syncer) syncContacts(ctx context.Context, trigger Trigger, mailbox stri
 		return run
 	}
 
+	// An empty register is not an instruction to empty the address books —
+	// and here it would be worse than in a group, because a contact card
+	// carries the name, the number and the notes, not just an address. On a
+	// fresh deployment these labels are the only copy of the membership
+	// there is, and they are what -import reads.
+	total := 0
+	for _, kind := range config.Kinds {
+		total += len(want[kind])
+	}
+	if total == 0 {
+		run.OK = false
+		run.Message = "the register is empty, so the address books were left alone — " +
+			"fill the register first (see -import)"
+		s.recordTarget(ctx, target, false, run.Message)
+		s.log.Warn("refusing to touch an address book from an empty register", "mailbox", mailbox)
+		return finish()
+	}
+
 	var touched []string
 	for _, kind := range config.Kinds {
 		label, err := s.gc.EnsureLabel(ctx, mailbox, s.cfg.Contacts.LabelFor(kind))
@@ -127,6 +145,24 @@ func (s *Syncer) reconcileLabel(ctx context.Context, target, mailbox string, kin
 	}
 	strays = append(strays, duplicates...)
 
+	// The same brake as the groups. Deleting a card throws away a name and a
+	// telephone number that may exist nowhere else, so the threshold counts
+	// only the cards that would actually be deleted — somebody who has merely
+	// moved between the two labels keeps their card and does not count.
+	doomed := 0
+	for _, card := range strays {
+		if m, ok := byKey[s.cfg.Sync.MatchKey(card.PrimaryEmail())]; ok && m.Current() && m.Kind != kind {
+			continue
+		}
+		doomed++
+	}
+	brake := s.cfg.Sync.MaxRemovalsPerRun
+	held := brake > 0 && doomed > brake
+	if held {
+		s.log.Warn("refusing a bulk contact deletion", "mailbox", mailbox,
+			"label", label.Name, "would_delete", doomed, "limit", brake)
+	}
+
 	for _, card := range strays {
 		email := card.PrimaryEmail()
 		touched = append(touched, email)
@@ -147,6 +183,13 @@ func (s *Syncer) reconcileLabel(ctx context.Context, target, mailbox string, kin
 			continue
 		}
 
+		if held {
+			run.OK, run.Failed = false, run.Failed+1
+			s.recordAddress(ctx, target, email, "", store.Absent, false,
+				fmt.Sprintf("would be deleted, but %d contacts at once is more than "+
+					"max_removals_per_run (%d) — nothing was deleted", doomed, brake))
+			continue
+		}
 		if !s.cfg.Contacts.Pruning() {
 			run.OK, run.Failed = false, run.Failed+1
 			s.recordAddress(ctx, target, email, "", store.Absent, false,

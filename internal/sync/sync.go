@@ -283,6 +283,22 @@ func (s *Syncer) syncGroup(ctx context.Context, trigger Trigger, g config.Group,
 		return run
 	}
 
+	// An empty register is not an instruction to empty the group.
+	//
+	// This is the state every deployment starts in, and the first thing it
+	// does is reconcile. Without this guard the very first run of a correctly
+	// configured registry removes every member of the house from their
+	// mailing list, and the only record of who they were is the log.
+	if len(want) == 0 {
+		run.OK = false
+		run.Message = "the register holds no current " + string(g.Kind) +
+			" members, so the group was left alone — fill the register first (see -import)"
+		s.recordTarget(ctx, target, false, run.Message)
+		s.log.Warn("refusing to touch a group from an empty register",
+			"group", g.Email, "kind", g.Kind)
+		return finish()
+	}
+
 	have, err := s.gc.GroupMembers(ctx, s.admin(), g.Email)
 	if err != nil {
 		run.OK, run.Failed = false, 1
@@ -325,23 +341,46 @@ func (s *Syncer) syncGroup(ctx context.Context, trigger Trigger, g config.Group,
 		s.recordAddress(ctx, target, email, m.ID, store.Present, true, "")
 	}
 
-	// Anything in the group that the register does not know about.
+	// Everything in the group the register does not know about, worked out in
+	// full before a single removal is made. Counting first is what lets the
+	// brake below see the size of what is about to happen.
+	var strays []string
 	for key, gm := range present {
 		if _, ok := wanted[key]; ok {
 			continue
 		}
-		// The address as Google spells it, which is what a removal must use
-		// and what the board should see on the page.
-		email := store.Email(gm.Email)
 		// Owners and managers are the group's own scaffolding. The register
 		// administers members; it does not administer the group.
 		if role := strings.ToUpper(gm.Role); role != "" && role != "MEMBER" {
 			continue
 		}
+		// The address as Google spells it, which is what a removal must use
+		// and what the board should see on the page.
+		email := store.Email(gm.Email)
 		if s.protected(g, email) {
 			continue
 		}
+		strays = append(strays, email)
+	}
+	sort.Strings(strays)
+
+	// A pass that wants to remove more than a handful is a mistake, not a
+	// busy week. Report it and change nothing: putting a group back by hand
+	// is an evening's work, and reading a list is a minute.
+	brake := s.cfg.Sync.MaxRemovalsPerRun
+	held := brake > 0 && len(strays) > brake
+
+	for _, email := range strays {
 		touched = append(touched, email)
+		if held {
+			run.OK = false
+			run.Failed++
+			s.recordAddress(ctx, target, email, "", store.Absent, false,
+				fmt.Sprintf("would be removed, but %d addresses at once is more than "+
+					"max_removals_per_run (%d) — check the list, then raise the limit "+
+					"or add them to the register", len(strays), brake))
+			continue
+		}
 		if !g.Pruning() {
 			run.OK = false
 			run.Failed++
@@ -357,6 +396,12 @@ func (s *Syncer) syncGroup(ctx context.Context, trigger Trigger, g config.Group,
 		}
 		run.Removed++
 		s.log.Info("removed a stray address from a group", "group", g.Email, "address", email)
+	}
+	if held {
+		run.Message = fmt.Sprintf("%d addresses would have been removed, which is over "+
+			"max_removals_per_run (%d); nothing was changed", len(strays), brake)
+		s.log.Warn("refusing a bulk removal", "group", g.Email,
+			"would_remove", len(strays), "limit", brake)
 	}
 
 	// Forget the addresses this target no longer has an opinion about, so an

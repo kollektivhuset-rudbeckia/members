@@ -269,6 +269,16 @@ type Sync struct {
 	// the board is told about it in as many words. Something that fixes itself
 	// on the next run was never worth a red banner.
 	AlertAfterMinutes int `yaml:"alert_after_minutes"`
+	// MaxRemovalsPerRun is a circuit breaker. A run that wants to take more
+	// than this many addresses out of a single group or label does nothing
+	// and reports instead.
+	//
+	// The board adds and loses a few members a year. A pass that wants to
+	// remove a dozen is not a busy week, it is a mistake — an empty register,
+	// a half-finished import, everybody marked as having left — and the
+	// difference between reporting that and carrying it out is a quiet
+	// evening versus rebuilding a group by hand. Zero turns the brake off.
+	MaxRemovalsPerRun int `yaml:"max_removals_per_run"`
 	// DotFoldDomains are the mail domains where a dot in the local part means
 	// nothing at all, so that anna.andersson@ and annaandersson@ are one
 	// mailbox rather than two.
@@ -447,6 +457,12 @@ func (c *Config) normalise() error {
 	}
 	c.Sheet.ID = strings.TrimSpace(c.Sheet.ID)
 
+	if c.Sync.MaxRemovalsPerRun == 0 {
+		c.Sync.MaxRemovalsPerRun = 5
+	}
+	if c.Sync.MaxRemovalsPerRun < 0 {
+		c.Sync.MaxRemovalsPerRun = 0 // explicitly off
+	}
 	if len(c.Sync.DotFoldDomains) == 0 {
 		// Google ignores dots on every domain it hosts, which is where most
 		// of the association's members have their mail.

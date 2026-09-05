@@ -68,6 +68,10 @@ groups:
       - admin@rudbeckia.nu
       - kontakt@rudbeckia.nu
       - valberedningen@rudbeckia.nu
+      # Låg i gruppen men under ingen kontaktetikett vid importen 2026-09-05.
+      # Ingen matchning i registret — ta reda på vem det är, skriv in hen som
+      # medlem, och ta sedan bort raden här.
+      - redacted@example.invalid
       - nagon@example.com
       - redacted@example.invalid
       - redacted@example.invalid
@@ -85,6 +89,18 @@ groups:
       - admin@rudbeckia.nu
       - kontakt@rudbeckia.nu
       - valberedningen@rudbeckia.nu
+      # Låg i gruppen men under ingen kontaktetikett vid importen 2026-09-05.
+      #
+      # De två första ser ut att vara samma personer som redan finns i
+      # registret, fast utan punkter: redacted@example.invalid och
+      # redacted@example.invalid. Hotmail och Proton skiljer på punkter, till
+      # skillnad från Gmail, så registret vågar inte anta att det är samma
+      # brevlåda — men en människa ser att det är det. Fråga dem vilken
+      # adress som gäller, rätta i registret, och ta bort raden här.
+      - redacted@example.invalid
+      - redacted@example.invalid
+      # Ingen matchning alls. Ta reda på vem det är.
+      - redacted@example.invalid
 
 # --------------------------------------------------------------------------
 # Kontaktspeglingen. Varje konto här får registret kopierat till sin egen
@@ -129,6 +145,19 @@ sync:
   # Hur länge en adress får misslyckas innan den röda bannern går på. Något
   # som rättar sig själv vid nästa körning var aldrig värt ett larm.
   alert_after_minutes: 30
+  # Nödbroms. En körning som vill ta bort fler än så här många adresser ur en
+  # grupp eller en etikett gör ingenting alls, och rapporterar i stället.
+  #
+  # Föreningen tappar några medlemmar om året. En körning som vill ta bort ett
+  # dussin är inte en händelserik vecka utan ett misstag — ett tomt register,
+  # en halvfärdig import, alla markerade som utträdda — och skillnaden mellan
+  # att rapportera det och att göra det är en lugn kväll mot att bygga upp en
+  # grupp för hand. 0 stänger av bromsen.
+  #
+  # Registret vägrar dessutom alltid röra en grupp eller adressbok när
+  # registret är tomt, oavsett vad som står här. Ett tomt register betyder
+  # "inte uppsatt ännu", aldrig "ta bort alla".
+  max_removals_per_run: 5
   # Domäner där en punkt i adressens första del inte betyder någonting, så
   # att anna.andersson@ och annaandersson@ är samma brevlåda.
   #

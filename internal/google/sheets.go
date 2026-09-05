@@ -37,14 +37,19 @@ func (c *Client) Sheet(ctx context.Context, mailbox, spreadsheetID, tab string) 
 		} `json:"sheets"`
 	}
 	if err := c.call(ctx, mailbox, SheetsScopes, "GET", endpoint, nil, &out); err != nil {
+		// The registry opens the spreadsheet *as* mailbox, not as itself, so
+		// that is the address the sheet has to be shared with. Naming the
+		// service account here — as this used to — sends somebody to share a
+		// document with an address that will never open it.
 		if NotFound(err) {
-			return SheetInfo{}, fmt.Errorf("there is no spreadsheet with id %s, "+
-				"or %s cannot see it — share it with the service account %s as an editor",
-				spreadsheetID, mailbox, c.Account())
+			return SheetInfo{}, fmt.Errorf("there is no spreadsheet with id %s that %s can see "+
+				"— share it with %s as an editor, or correct sheet.id in config.yaml",
+				spreadsheetID, mailbox, mailbox)
 		}
 		if Forbidden(err) {
-			return SheetInfo{}, fmt.Errorf("the service account %s may not open the spreadsheet: "+
-				"share it with that address as an editor", c.Account())
+			return SheetInfo{}, fmt.Errorf("%s may not open the spreadsheet: share it with "+
+				"%s as an editor (the registry writes the sheet as that account, not as "+
+				"the service account %s)", mailbox, mailbox, c.Account())
 		}
 		return SheetInfo{}, err
 	}
