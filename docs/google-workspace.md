@@ -191,15 +191,42 @@ datakontroll → API-kontroller** → längst ner, **Hantera domänvid delegerin
 | Fält | Värde |
 |---|---|
 | Client ID | tjugosiffran från 4c |
-| OAuth-scopes | de fyra nedan, kommaseparerade |
+| OAuth-omfattningar | de fyra nedan |
+
+### Varje scope måste vara hela adressen
+
+Det här är den enda fällan i hela uppsättningen som ser ut som ett stavfel och
+inte är det. Rutan kräver **hela URL:en**, inklusive
+`https://www.googleapis.com/auth/`. Skriver du bara den sista biten —
+
+```
+admin.directory.group.member          ← Ogiltig omfattning
+```
+
+— svarar rutan **”Ogiltig omfattning”** i rött och vägrar spara. Det gäller
+alla fyra, även `contacts` och `spreadsheets` som ser korta nog att klara sig
+utan.
+
+Rätt form:
+
+```
+https://www.googleapis.com/auth/admin.directory.group.member
+https://www.googleapis.com/auth/admin.directory.group.readonly
+https://www.googleapis.com/auth/contacts
+https://www.googleapis.com/auth/spreadsheets
+```
+
+Enklast: kopiera raden nedan och klistra in **hela** i den *första* rutan.
+Dialogen delar själv upp den på kommatecknen och lägger en rad per scope, så
+du slipper skriva fyra långa adresser för hand.
 
 ```
 https://www.googleapis.com/auth/admin.directory.group.member,https://www.googleapis.com/auth/admin.directory.group.readonly,https://www.googleapis.com/auth/contacts,https://www.googleapis.com/auth/spreadsheets
 ```
 
-Klistra in dem på en rad, precis så. **Ett scope som skiljer sig på ett tecken
-ger ett `unauthorized_client` som inte säger vilket** — så jämför hellre en
-gång för mycket. Samma lista finns i koden, i `internal/google/token.go`.
+**Ett scope som skiljer sig på ett tecken ger ett `unauthorized_client` som
+inte säger vilket** — så jämför hellre en gång för mycket. Samma lista finns i
+koden, i `internal/google/token.go`.
 
 Vad de fyra får göra, och inte:
 
@@ -317,6 +344,7 @@ loggen. Här är vad de brukar betyda.
 
 | Vad du ser | Vad det är | Vad du gör |
 |---|---|---|
+| **`Ogiltig omfattning`** i delegeringsrutan | ett scope saknar `https://www.googleapis.com/auth/` | skriv hela adressen, se Del 5 |
 | `Google will not let the service account act as ...` (`unauthorized_client`) | domänvid delegering saknas, eller ett scope skiljer sig | kontrollera Unique ID och de fyra scopes i Del 5 |
 | `Google refused the impersonation of ...` (`invalid_grant`) | kontot finns inte, eller serverns klocka går fel | kontrollera adressen; kör `timedatectl` på servern |
 | `the service account ... may not read ...` | `GOOGLE_ADMIN_SUBJECT` är inte administratör | ge kontot rollen Grupper, eller peka ut en superadmin |
