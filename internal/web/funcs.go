@@ -48,9 +48,9 @@ func (s *Server) funcs(lang i18n.Lang) template.FuncMap {
 		// UTC cannot show yesterday's date to somebody in Uppsala.
 		"local": func(t time.Time) time.Time { return t.In(s.cfg.Location()) },
 
-		// fee is the yearly fee for a kind of membership, so the amount on a
-		// tick-off form comes from the configuration and not from a template.
-		"fee": func(k any) int { return s.cfg.Membership.FeeFor(asKind(k)) },
+		// fee is the fee for a kind of membership in a year, so the amount on
+		// a tick-off form comes from the configuration and not a template.
+		"fee": func(k any, year int) int { return s.cfg.Membership.FeeFor(asKind(k), year) },
 
 		// account is the address behind a role, for the sentences that have
 		// to say "ask ekonomi@rudbeckia.nu" rather than "ask the cashier".

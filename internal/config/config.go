@@ -6,6 +6,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -98,9 +99,19 @@ type Membership struct {
 	// same unless FeeKrVan says otherwise.
 	FeeKr    int `yaml:"fee_kr"`
 	FeeKrVan int `yaml:"fee_kr_van"`
+	// FeesByYear overrides the fee for particular years.
+	//
+	// The association raises the fee from time to time, and a register that
+	// only knows this year's would quietly restate history: last year's
+	// unpaid 250 would become an unpaid 300 the moment the meeting voted.
+	// What somebody owes for a year is what the fee was that year.
+	FeesByYear map[int]int `yaml:"fees_by_year"`
 	// Bankgiro is the account the fee is paid into, shown to the cashiers so
-	// they know which statement they are ticking off against.
+	// they know which statement they are ticking off against, and to anybody
+	// paying.
 	Bankgiro string `yaml:"bankgiro"`
+	// Swish is the association's Swish number. Empty offers bankgiro alone.
+	Swish string `yaml:"swish"`
 	// DueOn is the day of the year the fee is due, as "MM-DD".
 	DueOn string `yaml:"due_on"`
 	// GraceDays is how long after the due date an unpaid member is left in
@@ -120,12 +131,57 @@ type Membership struct {
 	ChaseFromYear int `yaml:"chase_from_year"`
 }
 
-// FeeFor returns the yearly fee for a kind of membership, in kronor.
-func (m Membership) FeeFor(k Kind) int {
+// FeeFor returns the fee for a kind of membership in a given year, in kronor.
+//
+// A year with its own entry in fees_by_year wins outright, for both kinds:
+// when the association votes a new fee it votes one number, not one per sort
+// of member. Everything else falls back to the standing fee.
+func (m Membership) FeeFor(k Kind, year int) int {
+	if fee, ok := m.FeesByYear[year]; ok {
+		return fee
+	}
 	if k == KindVan && m.FeeKrVan > 0 {
 		return m.FeeKrVan
 	}
 	return m.FeeKr
+}
+
+// TakesSwish reports whether Swish is on offer.
+func (m Membership) TakesSwish() bool { return strings.TrimSpace(m.Swish) != "" }
+
+// SwishNumber is the number with the spaces people write it with taken out,
+// which is the form the Swish payload wants.
+func (m Membership) SwishNumber() string {
+	return strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, m.Swish)
+}
+
+// Reference is how somebody paying is asked to label the transfer, so the
+// cashier can match it to a person.
+func (m Membership) Reference(name string) string {
+	pattern := strings.TrimSpace(m.PaymentReference)
+	if pattern == "" {
+		pattern = "Medlemsavgift %s"
+	}
+	if !strings.Contains(pattern, "%s") {
+		return strings.TrimSpace(pattern + " " + name)
+	}
+	return strings.TrimSpace(fmt.Sprintf(pattern, name))
+}
+
+// FeeYears are the years with a fee of their own, oldest first, so a page can
+// show what is coming without guessing.
+func (m Membership) FeeYears() []int {
+	out := make([]int, 0, len(m.FeesByYear))
+	for y := range m.FeesByYear {
+		out = append(out, y)
+	}
+	sort.Ints(out)
+	return out
 }
 
 // DueDate returns the day the fee for a year is due.

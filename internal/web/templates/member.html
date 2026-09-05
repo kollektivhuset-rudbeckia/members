@@ -61,7 +61,7 @@
 <section class="panel" id="avgifter">
 	<div class="panel-head">
 		<h2>{{t "member.fees"}}</h2>
-		<span class="muted small">{{t "member.fees.each" (money (fee $m.Kind))}}</span>
+		<span class="muted small">{{t "member.fees.each" (money (fee $m.Kind $.Now.Year)) $.Now.Year}}</span>
 	</div>
 
 	{{if not (.May "pay")}}
@@ -100,7 +100,7 @@
 						<form method="post" action="/medlem/{{$m.ID}}/betalning" class="inline pay-form">
 							<input type="hidden" name="ar" value="{{.}}">
 							<input type="text" name="belopp" inputmode="numeric" class="tiny"
-							       value="{{fee $m.Kind}}" aria-label="{{t "col.amount"}}">
+							       value="{{fee $m.Kind .}}" aria-label="{{t "col.amount"}}">
 							<input type="date" name="datum" class="tiny"
 							       value="{{isoDate $.Now}}" aria-label="{{t "col.paidon"}}">
 							<button type="submit" class="button small primary">{{t "member.fees.record"}}</button>

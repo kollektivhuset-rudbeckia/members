@@ -125,10 +125,10 @@ func Compute(m store.Member, payments []store.Payment, cfg *config.Config, now t
 		}
 		if now.After(endOfDay(DueBy(m, cfg, y), loc)) {
 			st.Unpaid = append(st.Unpaid, y)
-			st.OwedKr += cfg.Membership.FeeFor(m.Kind)
+			st.OwedKr += cfg.Membership.FeeFor(m.Kind, y)
 		} else if y == year {
 			// Not yet due, but still expected before the year is out.
-			st.OwedKr += cfg.Membership.FeeFor(m.Kind)
+			st.OwedKr += cfg.Membership.FeeFor(m.Kind, y)
 		}
 	}
 

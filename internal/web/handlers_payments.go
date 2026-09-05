@@ -106,7 +106,7 @@ func (s *Server) handlePay(w http.ResponseWriter, r *http.Request, v *view) {
 		return
 	}
 
-	amount := s.cfg.Membership.FeeFor(m.Kind)
+	amount := s.cfg.Membership.FeeFor(m.Kind, year)
 	if raw := strings.TrimSpace(r.FormValue("belopp")); raw != "" {
 		// A comma is how a Swedish keyboard writes a decimal point, and the
 		// register counts in whole kronor anyway — so take the krona part and

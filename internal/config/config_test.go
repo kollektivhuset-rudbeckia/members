@@ -151,15 +151,87 @@ func TestDueDateReadsTheConfiguredDay(t *testing.T) {
 
 func TestFeeForFallsBackToTheSharedFee(t *testing.T) {
 	cfg := parse(t, minimal)
-	if got := cfg.Membership.FeeFor(KindVan); got != 200 {
+	if got := cfg.Membership.FeeFor(KindVan, 2026); got != 200 {
 		t.Errorf("with no separate friend fee: got %d, want 200", got)
 	}
 	cfg.Membership.FeeKrVan = 100
-	if got := cfg.Membership.FeeFor(KindVan); got != 100 {
+	if got := cfg.Membership.FeeFor(KindVan, 2026); got != 100 {
 		t.Errorf("with a separate friend fee: got %d, want 100", got)
 	}
-	if got := cfg.Membership.FeeFor(KindBo); got != 200 {
+	if got := cfg.Membership.FeeFor(KindBo, 2026); got != 200 {
 		t.Errorf("resident fee should be unaffected: got %d, want 200", got)
+	}
+}
+
+// The association raises the fee from time to time. A register that only knew
+// the current one would restate history: last year's unpaid 250 would become
+// an unpaid 300 the moment the meeting voted.
+func TestAYearWithItsOwnFeeWins(t *testing.T) {
+	cfg := parse(t, `
+site: {title: Test, language: sv, timezone: Europe/Stockholm}
+membership:
+  fee_kr: 300
+  fee_kr_van: 100
+  fees_by_year:
+    2026: 250
+    2027: 300
+groups:
+  - {kind: bo, email: bo@example.test}
+`)
+	tests := []struct {
+		year int
+		kind Kind
+		want int
+	}{
+		{2026, KindBo, 250},
+		// A voted fee is one number, not one per sort of member, so the year
+		// beats the friend rate too.
+		{2026, KindVan, 250},
+		{2027, KindBo, 300},
+		{2027, KindVan, 300},
+		// A year nobody voted on falls back, and there the friend rate holds.
+		{2025, KindBo, 300},
+		{2025, KindVan, 100},
+	}
+	for _, tc := range tests {
+		if got := cfg.Membership.FeeFor(tc.kind, tc.year); got != tc.want {
+			t.Errorf("%d %s: got %d, want %d", tc.year, tc.kind, got, tc.want)
+		}
+	}
+	if got := cfg.Membership.FeeYears(); len(got) != 2 || got[0] != 2026 || got[1] != 2027 {
+		t.Errorf("FeeYears: got %v, want [2026 2027]", got)
+	}
+}
+
+func TestSwishIsOptionalAndNormalised(t *testing.T) {
+	cfg := parse(t, minimal)
+	if cfg.Membership.TakesSwish() {
+		t.Error("Swish is on offer with no number configured")
+	}
+	cfg.Membership.Swish = " 123 456 78 90 "
+	if !cfg.Membership.TakesSwish() {
+		t.Error("Swish is not on offer with a number configured")
+	}
+	if got := cfg.Membership.SwishNumber(); got != "1234567890" {
+		t.Errorf("got %q, want the digits alone", got)
+	}
+}
+
+func TestThePaymentReferenceNamesThePayer(t *testing.T) {
+	cfg := parse(t, minimal)
+	cfg.Membership.PaymentReference = "Medlemsavgift %s"
+	if got := cfg.Membership.Reference("Anna Andersson"); got != "Medlemsavgift Anna Andersson" {
+		t.Errorf("got %q", got)
+	}
+	// A pattern with nowhere to put the name still has to carry it, or the
+	// cashier cannot match the payment to a person.
+	cfg.Membership.PaymentReference = "Medlemsavgift"
+	if got := cfg.Membership.Reference("Anna"); got != "Medlemsavgift Anna" {
+		t.Errorf("got %q", got)
+	}
+	cfg.Membership.PaymentReference = ""
+	if got := cfg.Membership.Reference("Anna"); got != "Medlemsavgift Anna" {
+		t.Errorf("got %q", got)
 	}
 }
 

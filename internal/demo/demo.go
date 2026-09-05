@@ -120,7 +120,7 @@ func Seed(ctx context.Context, st *store.Store, cfg *config.Config, now time.Tim
 		// the tenure column interesting.
 		for y := m.JoinedOn.Year(); y <= left.Year(); y++ {
 			if err := st.RecordPayment(ctx, store.Payment{
-				MemberID: m.ID, Year: y, AmountKr: cfg.Membership.FeeFor(m.Kind),
+				MemberID: m.ID, Year: y, AmountKr: cfg.Membership.FeeFor(m.Kind, y),
 				PaidOn:       time.Date(y, time.February, 12, 0, 0, 0, 0, loc),
 				Method:       "Bankgiro",
 				RegisteredBy: "ekonomi@rudbeckia.nu",
@@ -190,7 +190,7 @@ func pay(ctx context.Context, st *store.Store, cfg *config.Config, m store.Membe
 			continue
 		}
 		if err := st.RecordPayment(ctx, store.Payment{
-			MemberID: m.ID, Year: y, AmountKr: cfg.Membership.FeeFor(m.Kind),
+			MemberID: m.ID, Year: y, AmountKr: cfg.Membership.FeeFor(m.Kind, y),
 			PaidOn: when, Method: "Bankgiro",
 			RegisteredBy: "ekonomi@rudbeckia.nu", RegisteredAt: when.AddDate(0, 0, 2),
 		}); err != nil {

@@ -223,7 +223,7 @@ var catalog = map[string]entry{
 	"member.proposals":              {"Förslag", "Proposals"},
 
 	"member.fees":              {"Årsavgifter", "Yearly fees"},
-	"member.fees.each":         {"%s per år", "%s a year"},
+	"member.fees.each":         {"%s för %d", "%s for %d"},
 	"member.fees.cashieronly":  {"Bara %s kan pricka av en betalning. De är de som har bankkontot framför sig.", "Only %s can tick off a payment. They are the ones with the bank account in front of them."},
 	"member.fees.nothing":      {"Ingen betalning registrerad", "No payment recorded"},
 	"member.fees.record":       {"Pricka av", "Tick off"},
@@ -242,7 +242,7 @@ var catalog = map[string]entry{
 	"fees.received":    {"inbetalt %d", "received %d"},
 	"fees.outstanding": {"utestående", "outstanding"},
 	"fees.havepaid":    {"har betalat", "have paid"},
-	"fees.bankgiro":    {"Avgiften betalas till bankgiro %s och är %s per år.", "The fee is paid to bankgiro %s and is %s a year."},
+	"fees.bankgiro":    {"Avgiften betalas till bankgiro %s och är %s för %d.", "The fee is paid to bankgiro %s and is %s for %d."},
 	"fees.tick":        {"Prickar du av här stannar du kvar på sidan.", "Ticking off here keeps you on this page."},
 	"fees.chase":       {"%d har inte betalat i tid", "%d have not paid on time"},
 	"fees.chase.lede":  {"De här har passerat sitt sista datum. En ny medlem får alltid sin egen frist räknad från dagen hen skrevs in.", "These have passed their last date. A new member always gets their own allowance, counted from the day they were written down."},

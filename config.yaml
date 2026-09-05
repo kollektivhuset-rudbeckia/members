@@ -24,25 +24,37 @@ site:
   footer_note_en: Rudbeckia housing co-operative · Rosendal, Uppsala
 
 membership:
-  # Årsavgiften i hela kronor. Avgiften löper per kalenderår: en betalning
-  # täcker januari till december.
-  fee_kr: 200
+  # Årsavgiften i hela kronor. Föreningen höjer den då och då, och ett år med
+  # egen rad under fees_by_year gäller före den här.
+  fee_kr: 300
   # Sätt bara den här om vänmedlemmar betalar något annat än bomedlemmar.
   # 0 betyder samma avgift för båda.
   fee_kr_van: 0
-  bankgiro: "000-0000"
+  # Vad avgiften var, och blir, ett visst år.
+  #
+  # Utan det här skulle registret skriva om historien: en obetald 250:a från
+  # 2026 blev en obetald 300:a i samma stund som mötet röstade igenom
+  # höjningen. Det man är skyldig för ett år är vad avgiften var det året.
+  fees_by_year:
+    2026: 250
+    2027: 300
+
+  bankgiro: "5752-5925"
+  # Föreningens Swish-nummer, med eller utan mellanslag. Lämna tomt så
+  # erbjuds bara bankgiro på sidan där man går med.
+  swish: ""
   payment_reference: "Medlemsavgift %s"
 
-  # Sista dagen att betala, som MM-DD. Årsmötet brukar ligga i mars.
-  due_on: "03-31"
+  # Sista dagen att betala, som MM-DD. Enligt medlemssidan betalas avgiften
+  # mellan 1 januari och sista februari, så det är februari som gäller.
+  due_on: "02-28"
   # Hur länge efter sista dagen någon får vara i fred innan registret börjar
   # kalla avgiften förfallen. En vecka eller två är lagom — det ska hinna
   # bokföras innan någon får en påminnelse.
   grace_days: 14
-  # Hur många dagar en ny medlem får på sig, räknat från dagen hen skrevs in.
-  # Det är den här raden som gör att man kan lägga in någon så fort hen visat
-  # intresse utan att hen är röd i registret samma eftermiddag. Är den satt
-  # till 45 hörs det av sig efter ungefär sex veckor.
+  # Hur många dagar en ny medlem får på sig, räknat från dagen registret fick
+  # veta om hen. Det är den här raden som gör att man kan lägga in någon så
+  # fort hen visat intresse utan att hen är röd i registret samma eftermiddag.
   new_member_days: 45
 
 # --------------------------------------------------------------------------

@@ -27,7 +27,7 @@
 </div>
 
 {{if .Data.Fee.Bankgiro}}
-<p class="note">{{t "fees.bankgiro" .Data.Fee.Bankgiro (money (fee "bo"))}}</p>
+<p class="note">{{t "fees.bankgiro" .Data.Fee.Bankgiro (money (fee "bo" $year)) $year}}</p>
 {{end}}
 
 {{with .Data.Overdue}}
@@ -126,7 +126,7 @@
 							<input type="hidden" name="ar" value="{{$year}}">
 							<input type="hidden" name="tillbaka" value="{{$.Here}}">
 							<input type="text" name="belopp" inputmode="numeric" class="tiny"
-							       value="{{fee .Member.Kind}}" aria-label="{{t "col.amount"}}">
+							       value="{{fee .Member.Kind $year}}" aria-label="{{t "col.amount"}}">
 							<button type="submit" class="button small primary">{{t "member.fees.record"}}</button>
 						</form>
 						{{end}}
