@@ -3,6 +3,9 @@ package google
 import (
 	"errors"
 	"net/http"
+	"os"
+	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -180,3 +183,45 @@ func indexOf(haystack, needle string) int {
 	}
 	return -1
 }
+
+// The scopes have to be pasted into the Workspace admin console by hand, so
+// the documentation quotes them. A scope that is in the code but not in the
+// console fails at runtime with a bewildering 401 — and a scope the setup
+// guide gets wrong sends somebody to look for the fault in the wrong place
+// entirely. This keeps the three lists honest.
+func TestTheDocumentationQuotesTheRealScopes(t *testing.T) {
+	want := map[string]bool{}
+	for _, group := range [][]string{DirectoryScopes, ContactsScopes, SheetsScopes} {
+		for _, scope := range group {
+			want[scope] = true
+		}
+	}
+
+	for _, path := range []string{"../../README.md", "../../docs/google-workspace.md"} {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		// The README abbreviates the shared prefix; expand it before matching.
+		text := strings.ReplaceAll(string(raw), ".../auth/", "https://www.googleapis.com/auth/")
+
+		found := map[string]bool{}
+		for _, scope := range scopePattern.FindAllString(text, -1) {
+			found[scope] = true
+		}
+		for scope := range want {
+			if !found[scope] {
+				t.Errorf("%s does not mention the scope %s, which the code asks Google for",
+					path, scope)
+			}
+		}
+		for scope := range found {
+			if !want[scope] {
+				t.Errorf("%s tells the reader to grant %s, which the code never uses",
+					path, scope)
+			}
+		}
+	}
+}
+
+var scopePattern = regexp.MustCompile(`https://www\.googleapis\.com/auth/[a-z.]+`)

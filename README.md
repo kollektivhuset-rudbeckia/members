@@ -60,6 +60,12 @@ kalkylark. Det första krävs, det andra kan vänta — utan tjänstekonto funge
 registret precis som vanligt, men ingenting synkroniseras, och varje sida
 säger det med en gul banner.
 
+> **Sätter du upp det för första gången?** Ta
+> [docs/google-workspace.md](docs/google-workspace.md) i stället. Det är samma
+> sak steg för steg, med skärmvägar, vad de fyra behörigheterna får och inte
+> får göra, och en felsökningstabell över vad Googles meddelanden betyder.
+> Sammanfattningen nedan är för den som redan vet ungefär vad som ska hända.
+
 ### 1. OAuth-klienten (inloggningen)
 
 I [Google Cloud Console](https://console.cloud.google.com/), i ett projekt som
@@ -391,6 +397,11 @@ Allt hemligt sätts som miljövariabler, aldrig i `config.yaml`. Se
 | `TRUST_PROXY` | `true` | Läs klientens IP ur `X-Forwarded-For` |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` eller `error` |
 | `DEMO` | `false` | Demoläge: påhittade medlemmar, roller på begäran, ingen Google. **Aldrig skarpt** |
+
+Hela uppsättningen mot Google — projektet, API:erna, klienten, tjänstekontot
+och den domänvida delegeringen — står i
+[docs/google-workspace.md](docs/google-workspace.md), tillsammans med vad man
+gör åt varje felmeddelande.
 
 Föreningens egna uppgifter — avgiften, förfallodagen, grupperna, etiketterna,
 kalkylarket, synkintervallet — står i [`config.yaml`](config.yaml), som är
