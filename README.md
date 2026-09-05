@@ -498,6 +498,11 @@ ingenting.
 ghcr.io/kollektivhuset-rudbeckia/members:latest
 ```
 
+> **Flyttar du registret till en server för första gången?**
+> [docs/deploy.md](docs/deploy.md) går igenom vad som ska kopieras — särskilt
+> databasen, som är det enda som inte går att göra om — och i vilken ordning
+> överlämningen ska ske så att inte två system slåss om grupperna.
+
 Uppdatera på servern:
 
 ```bash
