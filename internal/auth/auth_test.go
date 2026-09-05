@@ -165,7 +165,6 @@ func TestStartBuildsAGoogleSignInAndPinsTheReply(t *testing.T) {
 		"https://accounts.google.com/o/oauth2/v2/auth",
 		"client_id=client-id",
 		"response_type=code",
-		"hd=example.test",
 		"prompt=select_account",
 		"redirect_uri=https%3A%2F%2Fmembers.example.test%2Foauth2%2Fcallback",
 	} {
@@ -173,6 +172,15 @@ func TestStartBuildsAGoogleSignInAndPinsTheReply(t *testing.T) {
 			t.Errorf("the sign-in address is missing %q:\n%s", want, where)
 		}
 	}
+	// No hd: it would narrow the chooser to a domain the browser usually has
+	// no session for, and Google answers that by skipping the chooser and
+	// signing the person in as themselves. The domain is enforced on the way
+	// back instead — see TestClaimsAreChecked.
+	if strings.Contains(where, "hd=") {
+		t.Errorf("the request pins a hosted domain, which suppresses the account "+
+			"chooser for the shared mailboxes:\n%s", where)
+	}
+
 	// The state cookie is what ties the reply back to this request. Without
 	// it, somebody who can set a cookie could pin a victim to their own
 	// sign-in.

@@ -161,13 +161,26 @@ func (g *Guard) Start(w http.ResponseWriter, next string) (string, error) {
 		"scope":         {"openid email profile"},
 		"state":         {state},
 		"nonce":         {nonce},
-		// hd narrows the account chooser to the Workspace. It is a hint, not
-		// a guarantee — the claim is checked again on the way back.
-		"hd": {g.rt.Google.HostedDomain},
-		// The three mailboxes are shared, so somebody signing in is often
-		// already signed in as themselves. Always ask which account.
+		// Always ask which account. The three mailboxes are shared, so
+		// whoever is signing in is nearly always already signed in as
+		// themselves and has to switch.
 		"prompt": {"select_account"},
 	}
+
+	// Deliberately no `hd` parameter.
+	//
+	// It looks like it belongs here — it tells Google to offer only accounts
+	// in the Workspace — but it is a hint with no security value whatever:
+	// the guarantee comes from checking the hd *claim* on the token that
+	// comes back, which checkClaims does and refuses without.
+	//
+	// What it does do is harm. Somebody signing in here is nearly always in a
+	// browser holding one personal Google session and no rudbeckia.nu one.
+	// Asked to narrow the chooser to a domain the browser has no session
+	// for, Google skips the chooser instead of showing it, and the person
+	// arrives back here having been signed in as themselves with no offer of
+	// picking anything else. Leaving it out gets the full chooser, with "Use
+	// another account" on it, which is exactly what a shared mailbox needs.
 	return authEndpoint + "?" + q.Encode(), nil
 }
 

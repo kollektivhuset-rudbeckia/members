@@ -77,15 +77,21 @@ var catalog = map[string]entry{
 	"alarm.off.see":  {"Så här kopplar du in det", "How to connect it"},
 
 	// --- signing in ----------------------------------------------------------
-	"login.title":       {"Logga in", "Sign in"},
-	"login.lede":        {"Medlemsregister för kollektivhuset.", "The housing co-operative's member register."},
-	"login.google":      {"Logga in med Google", "Sign in with Google"},
-	"login.who":         {"Bara föreningens konton i %s kommer in.", "Only the association's own accounts in %s get in."},
-	"login.demo":        {"Välj vilken roll du vill prova. I skarp drift loggar man in med Google i stället.", "Pick a part to try on. In earnest you sign in with Google instead."},
-	"login.notallowed":  {"Det kontot får inte använda registret. Det är %s som kommer in.", "That account may not use the register. It is %s that get in."},
-	"login.wrongdomain": {"Bara konton i %s får logga in.", "Only accounts in %s may sign in."},
-	"login.throttled":   {"För många försök. Vänta en kvart och prova igen.", "Too many attempts. Wait a quarter of an hour and try again."},
-	"login.failed":      {"Inloggningen gick inte igenom. Prova igen.", "The sign-in did not go through. Try again."},
+	"login.title":  {"Logga in", "Sign in"},
+	"login.lede":   {"Medlemsregister för kollektivhuset.", "The housing co-operative's member register."},
+	"login.google": {"Logga in med Google", "Sign in with Google"},
+	"login.who":    {"Bara föreningens konton i %s kommer in.", "Only the association's own accounts in %s get in."},
+	"login.demo":   {"Välj vilken roll du vill prova. I skarp drift loggar man in med Google i stället.", "Pick a part to try on. In earnest you sign in with Google instead."},
+	"login.notallowed": {
+		"Det kontot får inte använda registret. Det är %s som kommer in — välj ett av dem och prova igen.",
+		"That account may not use the register. It is %s that get in — pick one of them and try again.",
+	},
+	"login.wrongdomain": {
+		"Du loggade in med ett konto utanför %s. Välj ett av föreningens konton i stället — knappen nedan låter dig byta.",
+		"You signed in with an account outside %s. Pick one of the association's accounts instead — the button below lets you switch.",
+	},
+	"login.throttled": {"För många försök. Vänta en kvart och prova igen.", "Too many attempts. Wait a quarter of an hour and try again."},
+	"login.failed":    {"Inloggningen gick inte igenom. Prova igen.", "The sign-in did not go through. Try again."},
 
 	// --- the register --------------------------------------------------------
 	"register.title":        {"Medlemmar", "Members"},

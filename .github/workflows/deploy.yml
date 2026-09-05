@@ -1,0 +1,84 @@
+name: Deploy to quebec
+
+# Only after an image has actually been published. Chaining on the release
+# workflow rather than on the push means a deploy can never race the build
+# and restart the container onto the image it had before.
+on:
+  workflow_run:
+    workflows: ["Build and publish image"]
+    types: [completed]
+    branches: [main]
+  # And by hand, for rolling forward after a failed run.
+  workflow_dispatch:
+
+concurrency:
+  # One deploy at a time, and if two land together only the newer is worth
+  # doing. Never cancel one halfway: that could leave the container stopped.
+  group: deploy-quebec
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    # A failed build must not be deployed. workflow_dispatch has no upstream
+    # conclusion, so allow it through explicitly.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Deploy exactly what was built, not whatever main has drifted to
+          # in the minutes since.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Check the deploy secrets are present
+        env:
+          KEY: ${{ secrets.QUEBEC_SSH_KEY }}
+          HOST: ${{ secrets.QUEBEC_HOST }}
+        run: |
+          missing=
+          [ -n "$KEY" ]  || missing="$missing QUEBEC_SSH_KEY"
+          [ -n "$HOST" ] || missing="$missing QUEBEC_HOST"
+          if [ -n "$missing" ]; then
+            echo "::error::missing repository secrets:$missing"
+            exit 1
+          fi
+
+      - name: Deploy
+        env:
+          KEY: ${{ secrets.QUEBEC_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.QUEBEC_KNOWN_HOSTS }}
+          HOST: ${{ secrets.QUEBEC_HOST }}
+          USER: ${{ secrets.QUEBEC_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+          # The far end runs a forced command whatever we ask for, so this is
+          # a pipe rather than a copy: the files the container reads from
+          # disk, and the commit they came from.
+          echo "${{ github.event.workflow_run.head_sha || github.sha }}" > DEPLOYED_SHA
+          tar -czf - config.yaml docker-compose.yml DEPLOYED_SHA \
+            | ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes \
+                  -o ConnectTimeout=20 "$USER@$HOST" 2>&1 | tee deploy.log
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Deploy to quebec"
+            echo
+            echo '```'
+            cat deploy.log 2>/dev/null || echo "the deploy did not run"
+            echo '```'
+            echo
+            echo "<https://members.rudbeckia.nu/>"
+          } >> "$GITHUB_STEP_SUMMARY"

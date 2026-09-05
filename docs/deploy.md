@@ -160,3 +160,80 @@ igångvarande databas saknar det senaste som skrivits.
 
 Google är ingen säkerhetskopia. Grupperna har adresserna, kontakterna har namn
 och nummer, men inträdesdatum, betalningar och loggen finns bara här.
+
+---
+
+## Automatisk utrullning
+
+Efter den första handpåläggningen sköter sig servern själv. En push till
+`main` bygger en image; när bygget lyckats kör **Deploy to quebec** och
+servern hämtar den nya imagen och startar om.
+
+Kedjan hänger på `workflow_run` och inte på pushen, så en utrullning kan
+aldrig hinna före bygget och starta om på gårdagens image. Ett bygge som
+misslyckas rullas inte ut alls.
+
+### Hur den kommer in
+
+Nyckeln i `QUEBEC_SSH_KEY` når kontot `deploy` på quebec, och det kontot kan
+göra exakt en sak. `authorized_keys` binder nyckeln till ett *forced command*:
+
+```
+command="/usr/local/bin/deploy-members",no-agent-forwarding,no-port-forwarding,no-pty,...
+```
+
+Vad den andra änden än ber om kör ssh det skriptet. Inget skal, ingen scp,
+ingen vidarebefordran. Kontot har inget lösenord och ligger inte i `sudo`.
+
+Skriptet ägs av root och går inte att skriva till från `deploy`, så nyckeln
+kan inte heller peka om sig själv.
+
+### Vad som skickas
+
+Deploy-nycklar är avstängda för repot, så i stället för att ge servern en
+GitHub-kredential den annars aldrig behöver tar utrullningen med sig det den
+ska ha. Workflowet packar tre filer och skickar dem över samma ssh-kanal:
+
+| Fil | Varför |
+|---|---|
+| `config.yaml` | föreningens uppgifter, som containern läser från disk |
+| `docker-compose.yml` | hur den körs |
+| `DEPLOYED_SHA` | vilken commit som rullades ut |
+
+Skriptet packar upp **bara** de tre — de står uppräknade vid namn, vilket är
+det som gör att ett arkiv inte kan skriva var det vill. `.env` och
+`secrets/` finns bara på servern och rörs aldrig av en utrullning.
+
+Servern har alltså ingen GitHub-token och ingen väg till GitHub alls.
+
+### Hemligheter i repot
+
+| Secret | Vad |
+|---|---|
+| `QUEBEC_SSH_KEY` | privata halvan av nyckeln som kör `deploy-members` |
+| `QUEBEC_HOST` | `ssh.rudbeckia.nu` |
+| `QUEBEC_USER` | `deploy` |
+| `QUEBEC_KNOWN_HOSTS` | värdnyckeln, så att utrullningen inte litar på vad som helst |
+
+### När något går fel
+
+Utrullningen väntar på att `/healthz` svarar och avbryter med de sista
+loggraderna om den aldrig gör det. Den rullar **inte** tillbaka av sig själv —
+en container som inte startar lämnar den förra imagen kvar i registret, och
+att välja version är ett beslut för en människa:
+
+```bash
+ssh ssh.rudbeckia.nu
+cd /srv/members
+docker compose down
+docker run --rm -v members_members-data:/d -v /backup:/b alpine \
+    tar xzf /b/members-YYYY-MM-DD.tgz -C /d      # bara om databasen är trasig
+docker compose up -d
+```
+
+Vill du rulla ut för hand, eller igen efter en misslyckad körning:
+**Actions → Deploy to quebec → Run workflow**.
+
+Att en synksignal saknas är ingen misslyckad utrullning. Registret fungerar
+utan Google, och skriptet skriver `NOTE: a synchronisation target did not
+answer` i stället för att fälla körningen. Vad som är fel står på **/synk**.
