@@ -1,0 +1,141 @@
+{{define "content"}}
+{{$q := .Data.Query}}
+{{$f := $q.Filter}}
+
+<div class="hero hero-row">
+	<div>
+		<h1>{{t "register.title"}}</h1>
+		<p class="lede">{{t "register.lede"}}</p>
+	</div>
+	{{if .May "add"}}
+	<div class="hero-actions">
+		<a class="button primary" href="/medlem/ny">{{t "register.add"}}</a>
+	</div>
+	{{end}}
+</div>
+
+{{if .Data.Empty}}
+<section class="panel panel-empty">
+	<h2>{{t "register.empty"}}</h2>
+	<p class="lede">{{t "register.empty.lede"}}</p>
+	<ul class="steps">
+		<li>{{t "register.empty.import"}} <code>members -import -dry-run</code></li>
+		<li>{{t "register.empty.byhand"}} <a href="/medlem/ny">{{t "register.add"}}</a></li>
+	</ul>
+</section>
+{{else}}
+
+<div class="stats">
+	<a class="stat" href="{{query "/" "typ" "bo"}}">
+		<strong>{{.Data.Counts.Bo}}</strong><span>{{t "kind.bo.plural"}}</span>
+	</a>
+	<a class="stat" href="{{query "/" "typ" "van"}}">
+		<strong>{{.Data.Counts.Van}}</strong><span>{{t "kind.van.plural"}}</span>
+	</a>
+	<a class="stat" href="{{query "/" "avgift" "paid"}}">
+		<strong>{{.Data.Counts.Paid}}</strong><span>{{t "stat.paid" .Now.Year}}</span>
+	</a>
+	<a class="stat {{if .Data.Counts.Overdue}}stat-bad{{end}}" href="{{query "/" "avgift" "overdue"}}">
+		<strong>{{.Data.Counts.Overdue}}</strong><span>{{t "stat.overdue"}}</span>
+	</a>
+	<a class="stat" href="{{query "/" "visa" "former"}}">
+		<strong>{{.Data.Counts.Former}}</strong><span>{{t "stat.former"}}</span>
+	</a>
+</div>
+
+<section class="panel">
+	<h2 class="visually-hidden">{{t "filter.title"}}</h2>
+	<form method="get" action="/" class="filter-form">
+		<div class="field grow">
+			<label for="sok">{{t "filter.search"}}</label>
+			<input id="sok" name="sok" type="search" value="{{$f.Query}}"
+			       placeholder="{{t "filter.search.hint"}}" autocomplete="off"
+			       data-table-filter="#roster">
+		</div>
+		<div class="field">
+			<label for="typ">{{t "filter.kind"}}</label>
+			<select id="typ" name="typ">
+				<option value="">{{t "all"}}</option>
+				{{range .Data.Kinds}}
+				<option value="{{.Kind}}" {{if eq $f.Kind .Kind}}selected{{end}}>{{.Label}}</option>
+				{{end}}
+			</select>
+		</div>
+		<div class="field">
+			<label for="avgift">{{t "filter.fee" .Now.Year}}</label>
+			<select id="avgift" name="avgift">
+				<option value="">{{t "all"}}</option>
+				<option value="paid" {{if eq $f.Fee "paid"}}selected{{end}}>{{t "fee.paid"}}</option>
+				<option value="due" {{if eq $f.Fee "due"}}selected{{end}}>{{t "fee.due"}}</option>
+				<option value="overdue" {{if eq $f.Fee "overdue"}}selected{{end}}>{{t "fee.overdue"}}</option>
+			</select>
+		</div>
+		<div class="field">
+			<label for="visa">{{t "filter.show"}}</label>
+			<select id="visa" name="visa">
+				<option value="current" {{if eq $f.Show "current"}}selected{{end}}>{{t "filter.show.current"}}</option>
+				<option value="former" {{if eq $f.Show "former"}}selected{{end}}>{{t "filter.show.former"}}</option>
+				<option value="all" {{if eq $f.Show "all"}}selected{{end}}>{{t "filter.show.all"}}</option>
+			</select>
+		</div>
+		{{if $q.Sort}}<input type="hidden" name="ordna" value="{{$q.Sort}}">{{end}}
+		{{if $q.Desc}}<input type="hidden" name="fallande" value="1">{{end}}
+		<div class="filter-actions">
+			<button type="submit" class="button">{{t "filter.apply"}}</button>
+			{{if not $f.Empty}}<a class="button ghost" href="/">{{t "filter.clear"}}</a>{{end}}
+			<a class="button ghost" href="{{.Data.ExportURL}}">{{t "filter.export"}}</a>
+		</div>
+	</form>
+</section>
+
+<section class="panel">
+	<div class="panel-head">
+		<h2>
+			{{count "member" (len .Data.Rows)}}
+			{{if ne (len .Data.Rows) .Data.Total}}<small class="muted">{{t "register.of" .Data.Total}}</small>{{end}}
+		</h2>
+		<p class="muted small" data-filter-count hidden></p>
+	</div>
+
+	{{if .Data.Rows}}
+	<div class="table-wrap">
+		<table class="table table-hover" id="roster">
+			<thead>
+				<tr>
+					{{template "sorthead" dict "Q" $q "Base" "/" "Key" "name" "Label" (t "col.name")}}
+					{{template "sorthead" dict "Q" $q "Base" "/" "Key" "kind" "Label" (t "col.kind")}}
+					{{template "sorthead" dict "Q" $q "Base" "/" "Key" "email" "Label" (t "col.email")}}
+					<th>{{t "col.phone"}}</th>
+					{{template "sorthead" dict "Q" $q "Base" "/" "Key" "apartment" "Label" (t "col.apartment")}}
+					{{template "sorthead" dict "Q" $q "Base" "/" "Key" "joined" "Label" (t "col.joined")}}
+					{{template "sorthead" dict "Q" $q "Base" "/" "Key" "tenure" "Label" (t "col.tenure")}}
+					{{template "sorthead" dict "Q" $q "Base" "/" "Key" "fee" "Label" (t "col.fee")}}
+				</tr>
+			</thead>
+			<tbody>
+				{{range .Data.Rows}}
+				<tr {{if not .Current}}class="is-former"{{end}}>
+					<td class="cell-name">
+						<a href="/medlem/{{.Member.ID}}">{{with .Member.Name}}{{.}}{{else}}{{t "noname"}}{{end}}</a>
+						{{with .Member.Note}}<small class="muted">{{.}}</small>{{end}}
+					</td>
+					<td><span class="chip chip-{{.Member.Kind}}">{{t (printf "kind.%s" .Member.Kind)}}</span></td>
+					<td class="cell-email"><a href="mailto:{{.Member.Email}}">{{.Member.Email}}</a></td>
+					<td>{{with .Member.Phone}}<a href="tel:{{.}}">{{.}}</a>{{else}}<span class="muted">–</span>{{end}}</td>
+					<td>{{with .Member.Apartment}}{{.}}{{else}}<span class="muted">–</span>{{end}}</td>
+					<td class="nowrap">{{dateShort (local .Member.JoinedOn)}}</td>
+					<td class="nowrap">{{tenure .Years .Months}}</td>
+					<td>{{template "feebadge" .}}</td>
+				</tr>
+				{{end}}
+			</tbody>
+		</table>
+	</div>
+	<p class="empty" data-filter-empty hidden>{{t "register.nomatch"}}</p>
+	{{else}}
+	<p class="empty">{{t "register.nomatch"}}</p>
+	{{end}}
+</section>
+{{end}}
+{{end}}
+{{template "base" .}}

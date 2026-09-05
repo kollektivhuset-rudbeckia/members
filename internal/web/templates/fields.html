@@ -1,0 +1,91 @@
+{{/* A sortable column heading. It is a partial rather than repeated markup so
+     that the arrow, the aria-sort and the link cannot drift apart between
+     eight columns on two pages. */}}
+{{define "sorthead"}}
+{{- $q := .Q}}{{$state := $q.SortState .Key -}}
+<th {{with $state}}aria-sort="{{.}}"{{end}} class="sortable">
+	<a href="{{$q.SortLink .Base .Key}}">
+		{{.Label}}
+		{{if eq $state "ascending"}}<span class="arrow" aria-hidden="true">▲</span>
+		{{else if eq $state "descending"}}<span class="arrow" aria-hidden="true">▼</span>
+		{{else}}<span class="arrow arrow-idle" aria-hidden="true">↕</span>{{end}}
+	</a>
+</th>
+{{end}}
+
+{{/* Where somebody stands on this year's fee, in one badge. */}}
+{{define "feebadge"}}
+{{- if eq .Fee "paid"}}<span class="badge badge-ok">{{t "fee.paid"}}</span>
+{{- else if eq .Fee "overdue"}}<span class="badge badge-bad" title="{{t "fee.overdue.since" (dateShort .DueBy)}}">{{t "fee.overdue"}}</span>
+{{- else if eq .Fee "ended"}}<span class="badge badge-quiet">{{t "fee.ended"}}</span>
+{{- else}}<span class="badge badge-warn" title="{{t "fee.due.by" (dateShort .DueBy)}}">{{t "fee.due"}}</span>{{end}}
+{{end}}
+
+{{/* The member form. One partial for adding and for editing, so the two can
+     never ask for different things. */}}
+{{define "memberfields"}}
+{{$f := .Form}}
+<div class="field-grid">
+	<div class="field">
+		<label for="fornamn">{{t "form.firstname"}}</label>
+		<input id="fornamn" name="fornamn" type="text" value="{{$f.FirstName}}"
+		       autocomplete="given-name" placeholder="Anna" required>
+	</div>
+	<div class="field">
+		<label for="efternamn">{{t "form.lastname"}}</label>
+		<input id="efternamn" name="efternamn" type="text" value="{{$f.LastName}}"
+		       autocomplete="family-name" placeholder="Andersson">
+		{{with $f.Err "name"}}<small class="field-error">{{t .}}</small>{{end}}
+	</div>
+	<div class="field field-wide">
+		<label for="epost">{{t "form.email"}}</label>
+		<input id="epost" name="epost" type="email" value="{{$f.Email}}"
+		       autocomplete="email" spellcheck="false" autocapitalize="none"
+		       placeholder="anna@example.com" required
+		       aria-describedby="epost-hint">
+		<small class="hint" id="epost-hint">{{t "form.email.hint"}}</small>
+		{{with $f.Err "email"}}<small class="field-error">{{t .}}</small>{{end}}
+	</div>
+	<div class="field">
+		<label for="telefon">{{t "form.phone"}} <small>{{t "optional"}}</small></label>
+		<input id="telefon" name="telefon" type="tel" value="{{$f.Phone}}"
+		       autocomplete="tel" placeholder="070-123 45 67">
+	</div>
+	<div class="field">
+		<label for="typ">{{t "form.kind"}}</label>
+		<select id="typ" name="typ" data-kind-select>
+			{{range .Kinds}}
+			<option value="{{.Kind}}" {{if eq $f.Kind (printf "%s" .Kind)}}selected{{end}}>
+				{{.Label}}{{with .Group}} — {{.}}{{end}}
+			</option>
+			{{end}}
+		</select>
+		<small class="hint">{{t "form.kind.hint"}}</small>
+		{{with $f.Err "kind"}}<small class="field-error">{{t .}}</small>{{end}}
+	</div>
+	<div class="field" data-only-kind="bo">
+		<label for="lagenhet">{{t "form.apartment"}} <small>{{t "optional"}}</small></label>
+		<input id="lagenhet" name="lagenhet" type="text" value="{{$f.Apartment}}"
+		       inputmode="numeric" placeholder="1403">
+	</div>
+	<div class="field">
+		<label for="medlem_sedan">{{t "form.joined"}}</label>
+		<input id="medlem_sedan" name="medlem_sedan" type="date" value="{{$f.JoinedOn}}" required>
+		<small class="hint">{{t "form.joined.hint"}}</small>
+		{{with $f.Err "joined"}}<small class="field-error">{{t .}}</small>{{end}}
+	</div>
+	{{if not .New}}
+	<div class="field">
+		<label for="uttradd">{{t "form.left"}} <small>{{t "optional"}}</small></label>
+		<input id="uttradd" name="uttradd" type="date" value="{{$f.LeftOn}}">
+		<small class="hint">{{t "form.left.hint"}}</small>
+		{{with $f.Err "left"}}<small class="field-error">{{t .}}</small>{{end}}
+	</div>
+	{{end}}
+	<div class="field field-wide">
+		<label for="anteckning">{{t "form.note"}} <small>{{t "optional"}}</small></label>
+		<input id="anteckning" name="anteckning" type="text" maxlength="300"
+		       value="{{$f.Note}}" placeholder="{{t "form.note.hint"}}">
+	</div>
+</div>
+{{end}}

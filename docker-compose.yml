@@ -1,0 +1,48 @@
+services:
+  members:
+    image: ghcr.io/kollektivhuset-rudbeckia/members:latest
+    container_name: members-rudbeckia
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    environment:
+      # --- Krävs -----------------------------------------------------------
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?sätt GOOGLE_CLIENT_ID i .env}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?sätt GOOGLE_CLIENT_SECRET i .env}
+      BASE_URL: ${BASE_URL:-https://medlemmar.rudbeckia.nu}
+
+      # --- Synkroniseringen ------------------------------------------------
+      # Utan tjänstekontot fungerar registret, men ingenting skrivs till
+      # Google och varje sida säger tydligt att så är det.
+      GOOGLE_SERVICE_ACCOUNT_FILE: ${GOOGLE_SERVICE_ACCOUNT_FILE:-/secrets/service-account.json}
+      GOOGLE_ADMIN_SUBJECT: ${GOOGLE_ADMIN_SUBJECT:-}
+      GOOGLE_HOSTED_DOMAIN: ${GOOGLE_HOSTED_DOMAIN:-rudbeckia.nu}
+
+      # --- Vilka konton som kommer in --------------------------------------
+      ACCOUNT_INTAKE: ${ACCOUNT_INTAKE:-ny@rudbeckia.nu}
+      ACCOUNT_CASHIER: ${ACCOUNT_CASHIER:-ekonomi@rudbeckia.nu}
+      ACCOUNT_BOARD: ${ACCOUNT_BOARD:-styrelsen@rudbeckia.nu}
+      PAYMENT_ROLES: ${PAYMENT_ROLES:-cashier}
+
+      # --- Frivilligt ------------------------------------------------------
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      SESSION_HOURS: ${SESSION_HOURS:-12}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    env_file: .env
+    volumes:
+      - members-data:/data
+      # Mount your own configuration over the one baked into the image.
+      - ./config.yaml:/config.yaml:ro
+      # The service account key. Read-only, and never in the image.
+      - ./secrets:/secrets:ro
+    healthcheck:
+      # The image has no shell, so call the binary's own version check rather
+      # than curl, which is not in there either.
+      test: ["CMD", "/members", "-version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  members-data:

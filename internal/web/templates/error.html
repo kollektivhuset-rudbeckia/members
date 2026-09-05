@@ -1,0 +1,8 @@
+{{define "content"}}
+<div class="narrow">
+	<h1>{{.Data.Headline}}</h1>
+	{{with .Data.Detail}}<p class="lede">{{.}}</p>{{end}}
+	<p><a class="button" href="/">{{t "error.home"}}</a></p>
+</div>
+{{end}}
+{{template "base" .}}

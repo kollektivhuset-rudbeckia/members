@@ -1,0 +1,14 @@
+# Local database and its WAL sidecars
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Local secrets: the .env and the service account key
+.env
+*.sa.json
+/secrets/
+
+# Build output
+/members
+/dist/

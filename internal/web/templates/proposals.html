@@ -1,0 +1,108 @@
+{{define "content"}}
+<div class="hero">
+	<h1>{{t "proposals.title"}}</h1>
+	<p class="lede">{{t "proposals.lede" .Data.Board}}</p>
+</div>
+
+<section class="panel">
+	<div class="panel-head"><h2>{{t "proposals.waiting" (len .Data.Pending)}}</h2></div>
+
+	{{if .Data.Pending}}
+	<ul class="proposals">
+		{{range .Data.Pending}}
+		{{$p := .Proposal}}
+		<li class="proposal {{if .Deletion}}proposal-delete{{end}}">
+			<header class="proposal-head">
+				<div>
+					<span class="badge {{if .Deletion}}badge-bad{{else}}badge-info{{end}}">{{t (printf "proposal.kind.%s" $p.Kind)}}</span>
+					{{if .Missing}}
+					<strong>{{t "proposals.gone"}}</strong>
+					{{else}}
+					<strong><a href="/medlem/{{.Member.ID}}">{{with .Member.Name}}{{.}}{{else}}{{t "noname"}}{{end}}</a></strong>
+					<span class="chip chip-{{.Member.Kind}}">{{t (printf "kind.%s" .Member.Kind)}}</span>
+					{{end}}
+				</div>
+				<small class="muted">{{t "proposals.by" $p.ProposedBy (stamp (local $p.ProposedAt))}}</small>
+			</header>
+
+			{{with $p.Reason}}<p class="proposal-reason">{{.}}</p>{{end}}
+
+			{{if .Deletion}}
+			<p class="alert alert-error">{{t "proposals.deletewarn" $p.Before.Email}}</p>
+			{{else if .Changes}}
+			<div class="table-wrap">
+				<table class="table diff">
+					<thead><tr><th>{{t "proposals.field"}}</th><th>{{t "proposals.before"}}</th><th>{{t "proposals.after"}}</th></tr></thead>
+					<tbody>
+						{{range .Changes}}
+						<tr>
+							<td>{{t .FieldKey}}</td>
+							<td class="was">{{with .Before}}{{.}}{{else}}<span class="muted">–</span>{{end}}</td>
+							<td class="now"><strong>{{with .After}}{{.}}{{else}}<span class="muted">–</span>{{end}}</strong></td>
+						</tr>
+						{{end}}
+					</tbody>
+				</table>
+			</div>
+			{{else}}
+			<p class="muted">{{t "proposals.nochange"}}</p>
+			{{end}}
+
+			<footer class="proposal-actions">
+				{{if $.May "approve"}}
+				<form method="post" action="/andringar/{{$p.ID}}/godkann" class="inline-form"
+				      data-confirm="{{if .Deletion}}{{t "proposals.approve.delete.confirm"}}{{else}}{{t "proposals.approve.confirm"}}{{end}}">
+					<input type="text" name="kommentar" placeholder="{{t "proposals.comment"}}" maxlength="300">
+					<button type="submit" class="button primary">{{t "proposals.approve"}}</button>
+				</form>
+				<form method="post" action="/andringar/{{$p.ID}}/avsla" class="inline">
+					<button type="submit" class="button ghost">{{t "proposals.reject"}}</button>
+				</form>
+				{{else if .Mine}}
+				<form method="post" action="/andringar/{{$p.ID}}/aterta" class="inline">
+					<input type="hidden" name="tillbaka" value="{{$.Here}}">
+					<button type="submit" class="button ghost">{{t "proposals.withdraw"}}</button>
+				</form>
+				<span class="muted small">{{t "proposals.waitingon" $.Data.Board}}</span>
+				{{else}}
+				<span class="muted small">{{t "proposals.waitingon" $.Data.Board}}</span>
+				{{end}}
+			</footer>
+		</li>
+		{{end}}
+	</ul>
+	{{else}}
+	<p class="empty">{{t "proposals.none"}}</p>
+	{{end}}
+</section>
+
+{{with .Data.Decided}}
+<section class="panel">
+	<div class="panel-head"><h2>{{t "proposals.decided"}}</h2></div>
+	<div class="table-wrap">
+		<table class="table">
+			<thead><tr>
+				<th>{{t "proposals.what"}}</th><th>{{t "col.name"}}</th><th>{{t "proposals.byshort"}}</th>
+				<th>{{t "proposals.outcome"}}</th><th>{{t "proposals.when"}}</th>
+			</tr></thead>
+			<tbody>
+				{{range .}}
+				{{$p := .Proposal}}
+				<tr>
+					<td>{{t (printf "proposal.kind.%s" $p.Kind)}}</td>
+					<td>{{if .Missing}}<span class="muted">{{$p.Before.Email}}</span>{{else}}<a href="/medlem/{{.Member.ID}}">{{.Member.Name}}</a>{{end}}</td>
+					<td><small>{{$p.ProposedBy}}</small></td>
+					<td>
+						<span class="badge badge-{{proposalTone $p.Status}}">{{t (printf "proposal.%s" $p.Status)}}</span>
+						{{with $p.DecisionNote}}<small class="muted">{{.}}</small>{{end}}
+					</td>
+					<td class="nowrap"><small>{{if $p.DecidedAt.Valid}}{{stamp (local $p.DecidedAt.Time)}}{{else}}–{{end}}</small></td>
+				</tr>
+				{{end}}
+			</tbody>
+		</table>
+	</div>
+</section>
+{{end}}
+{{end}}
+{{template "base" .}}

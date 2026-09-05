@@ -1,0 +1,148 @@
+{{define "content"}}
+<div class="hero hero-row">
+	<div>
+		<h1>{{t "sync.title"}}</h1>
+		<p class="lede">
+			{{if .Data.On}}{{t "sync.lede" (duration .Data.Every)}}{{else}}{{t "sync.off.lede"}}{{end}}
+		</p>
+	</div>
+	{{if and .Data.On (.May "sync")}}
+	<div class="hero-actions">
+		<form method="post" action="/synk/kor" class="inline">
+			<button type="submit" class="button primary">{{t "sync.now"}}</button>
+		</form>
+	</div>
+	{{end}}
+</div>
+
+{{if not .Data.On}}
+<section class="panel panel-warn">
+	<h2>{{t "sync.off"}}</h2>
+	<p>{{t "sync.off.body"}}</p>
+	<p class="hint">{{t "sync.off.how"}}</p>
+</section>
+{{end}}
+
+{{if .Data.Trouble}}
+<section class="panel panel-bad">
+	<div class="panel-head"><h2>{{t "sync.trouble" (len .Data.Trouble)}}</h2></div>
+	<p class="muted small">{{t "sync.trouble.lede"}}</p>
+	<div class="table-wrap">
+		<table class="table">
+			<thead><tr>
+				<th>{{t "sync.address"}}</th><th>{{t "sync.where"}}</th><th>{{t "sync.wanted"}}</th>
+				<th>{{t "sync.why"}}</th><th>{{t "sync.howlong"}}</th>
+			</tr></thead>
+			<tbody>
+				{{range .Data.Trouble}}
+				{{$s := .State}}
+				<tr class="{{if .Loud}}is-loud{{end}}">
+					<td class="cell-name">
+						{{if $s.WholeTarget}}
+							<strong>{{t "sync.wholetarget"}}</strong>
+						{{else if $s.MemberID}}
+							<a href="/medlem/{{$s.MemberID}}">{{$s.Address}}</a>
+						{{else}}
+							<strong>{{$s.Address}}</strong>
+							<small class="muted">{{t "sync.stray"}}</small>
+						{{end}}
+					</td>
+					<td><code>{{$s.Target}}</code></td>
+					<td>
+						{{if eq (printf "%s" $s.Intent) "absent"}}{{t "sync.want.absent"}}
+						{{else if eq (printf "%s" $s.Intent) "present"}}{{t "sync.want.present"}}
+						{{else}}<span class="muted">–</span>{{end}}
+					</td>
+					<td class="danger-text">{{$s.Message}}</td>
+					<td class="nowrap">
+						{{if $s.FailingSince.Valid}}{{since (local $s.FailingSince.Time) $.Now}}{{else}}{{t "since.now"}}{{end}}
+						{{if not .Loud}}<small class="muted">{{t "sync.settling"}}</small>{{end}}
+					</td>
+				</tr>
+				{{end}}
+			</tbody>
+		</table>
+	</div>
+</section>
+{{else if .Data.On}}
+<p class="alert alert-ok">{{t "sync.allwell"}}</p>
+{{end}}
+
+{{if .Data.On}}
+<div class="cards">
+	{{range .Data.Targets}}
+	<article class="card card-target {{if .Loud}}is-bad{{end}}">
+		<header class="card-head">
+			<span class="card-emoji" aria-hidden="true">{{if eq .Kind "group"}}📮{{else if eq .Kind "contacts"}}📇{{else}}📊{{end}}</span>
+			<h3>{{t (printf "target.%s" .Kind)}}</h3>
+		</header>
+		<p class="card-desc"><code>{{if .Name}}{{.Name}}{{else}}{{$.Data.SheetTab}}{{end}}</code></p>
+		{{if .OK}}
+		<p class="badge badge-ok">{{t "sync.target.ok" .Members}}</p>
+		{{else}}
+		<p class="alert alert-error">{{.Message}}</p>
+		{{end}}
+		{{with .Trouble}}<p class="badge badge-bad">{{t "sync.target.bad" (len .)}}</p>{{end}}
+		{{with .Runs}}
+		<ul class="runs">
+			{{range .}}
+			<li class="{{if .OK}}is-ok{{else}}is-bad{{end}}">
+				<span class="dot" aria-hidden="true"></span>
+				<small>{{stamp (local .StartedAt)}}</small>
+				<small class="muted">{{t (printf "sync.trigger.%s" .Trigger)}}</small>
+				{{if .Changed}}
+					<small class="changed">{{t "sync.changed" .Added .Removed .Updated}}</small>
+				{{else if .OK}}
+					<small class="muted">{{t "sync.nochange"}}</small>
+				{{end}}
+				{{if not .OK}}<small class="danger-text">{{.Message}}</small>{{end}}
+			</li>
+			{{end}}
+		</ul>
+		{{end}}
+	</article>
+	{{end}}
+</div>
+{{end}}
+
+<section class="panel">
+	<div class="panel-head"><h2>{{t "sync.setup"}}</h2></div>
+	<dl class="facts-list">
+		<div><dt>{{t "sync.serviceaccount"}}</dt><dd>{{with .Data.SA}}<code>{{.}}</code>{{else}}<span class="muted">{{t "sync.none"}}</span>{{end}}</dd></div>
+		<div><dt>{{t "sync.admin"}}</dt><dd>{{with .Data.Admin}}<code>{{.}}</code>{{else}}<span class="muted">{{t "sync.none"}}</span>{{end}}</dd></div>
+		<div><dt>{{t "sync.sheet"}}</dt><dd>{{with .Data.SheetID}}<a href="https://docs.google.com/spreadsheets/d/{{.}}/edit" target="_blank" rel="noopener">{{$.Data.SheetTab}}</a>{{else}}<span class="muted">{{t "sync.none"}}</span>{{end}}</dd></div>
+		<div><dt>{{t "sync.every"}}</dt><dd>{{duration .Data.Every}}</dd></div>
+	</dl>
+</section>
+
+<section class="panel">
+	<div class="panel-head"><h2>{{t "sync.log"}}</h2></div>
+	{{if .Data.Runs}}
+	<div class="table-wrap">
+		<table class="table">
+			<thead><tr>
+				<th>{{t "sync.when"}}</th><th>{{t "sync.where"}}</th><th>{{t "sync.trigger"}}</th>
+				<th class="right">{{t "sync.added"}}</th><th class="right">{{t "sync.removed"}}</th>
+				<th class="right">{{t "sync.updated"}}</th><th>{{t "sync.result"}}</th>
+			</tr></thead>
+			<tbody>
+				{{range .Data.Runs}}
+				<tr class="{{if not .OK}}is-bad{{end}}">
+					<td class="nowrap"><small>{{stamp (local .StartedAt)}}</small></td>
+					<td><code>{{.Target}}</code></td>
+					<td><small class="muted">{{t (printf "sync.trigger.%s" .Trigger)}}</small></td>
+					<td class="right">{{if .Added}}{{.Added}}{{end}}</td>
+					<td class="right">{{if .Removed}}{{.Removed}}{{end}}</td>
+					<td class="right">{{if .Updated}}{{.Updated}}{{end}}</td>
+					<td>{{if .OK}}<span class="badge badge-ok">{{t "sync.ok"}}</span>{{else}}<span class="badge badge-bad" title="{{.Message}}">{{t "sync.failed"}}</span>{{end}}</td>
+				</tr>
+				{{end}}
+			</tbody>
+		</table>
+	</div>
+	{{else}}
+	<p class="empty">{{t "sync.nolog"}}</p>
+	{{end}}
+</section>
+{{end}}
+{{template "base" .}}

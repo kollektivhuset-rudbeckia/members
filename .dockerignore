@@ -1,0 +1,10 @@
+.git
+.github
+data
+secrets
+*.db
+*.db-shm
+*.db-wal
+*.sa.json
+.env
+README.md

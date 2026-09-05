@@ -1,0 +1,22 @@
+{{define "content"}}
+<nav class="crumbs"><a href="/">{{t "nav.register"}}</a><span aria-hidden="true">›</span>{{t "new.title"}}</nav>
+
+<div class="narrow">
+	<h1>{{t "new.title"}}</h1>
+	<p class="lede">{{t "new.lede"}}</p>
+
+	{{if .Data.Form.Bad}}
+	<p class="alert alert-error" role="alert">{{t "form.check"}}</p>
+	{{end}}
+
+	<form method="post" action="/medlem/ny" class="panel">
+		{{template "memberfields" .Data}}
+		<div class="form-actions">
+			<button type="submit" class="button primary">{{t "new.submit"}}</button>
+			<a class="button ghost" href="/">{{t "cancel"}}</a>
+		</div>
+		<p class="hint">{{t "new.note"}}</p>
+	</form>
+</div>
+{{end}}
+{{template "base" .}}

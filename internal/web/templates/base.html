@@ -1,0 +1,136 @@
+{{/* The flag of the language the switch moves to. Drawn rather than an emoji:
+     regional-indicator flags show as bare letters on Windows, and the theme
+     switch beside this one is inline SVG too. */}}
+{{define "flag"}}
+{{- if eq . "en"}}
+<svg class="flag" viewBox="0 0 16 10" width="21" height="13" aria-hidden="true" focusable="false">
+	<rect width="16" height="10" fill="#012169"/>
+	<path d="M0 0 16 10M16 0 0 10" stroke="#fff" stroke-width="2"/>
+	<path d="M0 0 16 10M16 0 0 10" stroke="#c8102e" stroke-width="1.1"/>
+	<path d="M8 0v10M0 5h16" stroke="#fff" stroke-width="3.3"/>
+	<path d="M8 0v10M0 5h16" stroke="#c8102e" stroke-width="2"/>
+</svg>
+{{- else}}
+<svg class="flag" viewBox="0 0 16 10" width="21" height="13" aria-hidden="true" focusable="false">
+	<rect width="16" height="10" fill="#006aa7"/>
+	<path d="M6 0v10M0 5h16" stroke="#fecc00" stroke-width="2"/>
+</svg>
+{{- end}}
+{{end}}
+
+{{define "base"}}<!doctype html>
+<html lang="{{.Lang}}" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="light dark">
+<title>{{if .Title}}{{.Title}} · {{end}}{{.Site.Title}}</title>
+<link rel="stylesheet" href="{{asset "app.css"}}">
+<link rel="icon" href="/static/rudbeckia.png" type="image/png">
+<link rel="apple-touch-icon" href="/static/rudbeckia.png">
+<script src="{{asset "app.js"}}" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">{{t "layout.skip"}}</a>
+<header class="topbar">
+	<div class="topbar-inner">
+		<a class="brand" href="/">
+			<img class="brand-mark" src="/static/rudbeckia.png" alt=""
+			     width="32" height="32" decoding="async">
+			<span class="brand-text">
+				<strong>{{.Site.Title}}</strong>
+				{{with siteTagline .Site}}<small>{{.}}</small>{{end}}
+			</span>
+		</a>
+		{{if .Role.LoggedIn}}
+		<nav class="topnav" aria-label="{{t "layout.menu"}}">
+			<a href="/" {{if eq .Path "/"}}aria-current="page"{{end}}>{{t "nav.register"}}</a>
+			<a href="/avgifter" {{if hasPrefix .Path "/avgifter"}}aria-current="page"{{end}}>
+				{{t "nav.fees"}}
+				{{if .Overdue}}<span class="tag tag-warn" title="{{t "nav.fees.overdue" .Overdue}}">{{.Overdue}}</span>{{end}}
+			</a>
+			<a href="/andringar" {{if hasPrefix .Path "/andringar"}}aria-current="page"{{end}}>
+				{{t "nav.proposals"}}
+				{{if .Pending}}<span class="tag tag-info" title="{{t "nav.proposals.waiting" .Pending}}">{{.Pending}}</span>{{end}}
+			</a>
+			<a href="/synk" {{if hasPrefix .Path "/synk"}}aria-current="page"{{end}}>
+				{{t "nav.sync"}}
+				{{if .Alarm.Bad}}<span class="tag tag-bad" title="{{t "nav.sync.trouble" .Alarm.Loud}}">{{.Alarm.Loud}}</span>{{end}}
+			</a>
+			{{if .May "approve"}}<a href="/logg" {{if hasPrefix .Path "/logg"}}aria-current="page"{{end}}>{{t "nav.log"}}</a>{{end}}
+		</nav>
+		{{end}}
+		<div class="topbar-actions">
+			<button type="button" class="icon-button" data-theme-toggle aria-label="{{t "layout.theme"}}">
+				<svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/></svg>
+				<svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4 8.2 8.2 0 1 0 20 14.2Z"/></svg>
+			</button>
+			{{/* A form rather than a link, so a prefetch cannot change it. */}}
+			<form method="post" action="/sprak" class="inline">
+				<input type="hidden" name="lang" value="{{.Other}}">
+				<input type="hidden" name="next" value="{{.Here}}">
+				<button type="submit" class="icon-button lang-button"
+				        aria-label="{{t "layout.language" .Other.Name}}"
+				        title="{{t "layout.language" .Other.Name}}">{{template "flag" .Other}}</button>
+			</form>
+			{{if .Role.LoggedIn}}
+			<span class="whoami" title="{{.Session.Email}}">
+				<strong>{{t (printf "role.%s" .Role)}}</strong>
+				<small>{{.Session.Email}}</small>
+			</span>
+			<form method="post" action="/logga-ut" class="inline">
+				<button type="submit" class="link-button">{{t "layout.signout"}}</button>
+			</form>
+			{{end}}
+		</div>
+	</div>
+</header>
+
+{{if .Demo}}
+<aside class="banner banner-demo">
+	<strong>{{t "layout.demo"}}</strong> {{t "layout.demo.body"}}
+</aside>
+{{end}}
+
+{{/* The whole point of the synchroniser, in one strip. A group that has been
+     wrong for a fortnight is the failure this register exists to prevent, so
+     it is said on every page and not tucked away on one. */}}
+{{if .Role.LoggedIn}}
+{{if .Alarm.Bad}}
+<aside class="banner banner-bad" role="alert">
+	<strong>{{t "alarm.title" .Alarm.Loud}}</strong>
+	{{if .Alarm.Worst}}{{t "alarm.worst" .Alarm.Worst}}{{end}}
+	<a href="/synk">{{t "alarm.see"}}</a>
+</aside>
+{{else if .Alarm.Off}}
+<aside class="banner banner-warn">
+	<strong>{{t "alarm.off"}}</strong> {{t "alarm.off.body"}}
+	{{if .May "sync"}}<a href="/synk">{{t "alarm.off.see"}}</a>{{end}}
+</aside>
+{{else if .Alarm.Total}}
+<aside class="banner banner-warn">
+	{{t "alarm.settling" .Alarm.Total}} <a href="/synk">{{t "alarm.see"}}</a>
+</aside>
+{{end}}
+{{end}}
+
+{{with .Flash}}
+<aside class="banner banner-{{$.FlashKind}}" role="status">{{.}}</aside>
+{{end}}
+
+<main id="main" class="page">
+	{{template "content" .}}
+</main>
+
+<footer class="footer">
+	<div class="footer-inner">
+		<p>{{with siteFooter .Site}}{{.}}{{else}}{{.Site.Title}}{{end}}</p>
+		<p class="muted">
+			{{if .Site.SupportURL}}<a href="{{.Site.SupportURL}}">{{t "layout.questions"}}</a>{{end}}
+			{{if .Site.HomeURL}} · <a href="{{.Site.HomeURL}}">Rudbeckia.nu</a>{{end}}
+		</p>
+	</div>
+</footer>
+</body>
+</html>{{end}}

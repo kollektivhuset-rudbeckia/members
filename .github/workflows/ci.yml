@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race -count=1 ./...
+
+      - name: Validate the bundled configuration
+        run: go run ./cmd/server -check-config
+        env:
+          # -check-config needs no credentials at all
+          CONFIG_PATH: config.yaml
+
+      # The demo is the first thing a newcomer runs, so make sure it starts,
+      # seeds itself, serves a page and hands out a session.
+      - name: Smoke test the demo
+        run: |
+          DB_PATH=$(mktemp -d)/demo.db go run ./cmd/server -demo &
+          pid=$!
+          trap 'kill $pid' EXIT
+          for _ in $(seq 1 40); do
+            curl -sf http://localhost:8080/healthz >/dev/null && break
+            sleep 0.5
+          done
+          curl -sf http://localhost:8080/healthz
+
+          # Signing in as the board should redirect, not render.
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -d 'roll=board' -d 'next=/' http://localhost:8080/demo-inloggning)
+          test "$code" = "303" || { echo "demo sign-in returned $code"; exit 1; }
+
+          # And the register itself should render, with no missing phrases.
+          curl -s -c /tmp/jar -o /dev/null \
+            -d 'roll=board' -d 'next=/' http://localhost:8080/demo-inloggning
+          for page in / /avgifter /andringar /synk /logg; do
+            body=$(curl -sf -b /tmp/jar "http://localhost:8080$page") || {
+              echo "$page did not render"; exit 1; }
+            if printf '%s' "$body" | grep -q '⟦'; then
+              echo "$page has a phrase missing from the catalogue:"
+              printf '%s' "$body" | grep -o '⟦[a-z0-9._]*⟧' | sort -u
+              exit 1
+            fi
+          done
+          echo "the demo starts, signs in and renders every page"

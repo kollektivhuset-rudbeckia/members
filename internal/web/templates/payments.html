@@ -1,0 +1,145 @@
+{{define "content"}}
+{{$q := .Data.Query}}
+{{$f := $q.Filter}}
+{{$year := .Data.Year}}
+
+<div class="hero hero-row">
+	<div>
+		<h1>{{t "fees.title"}}</h1>
+		<p class="lede">{{t "fees.lede" $year}}</p>
+	</div>
+	<div class="hero-actions">
+		<form method="get" action="/avgifter" class="inline-form">
+			<label class="visually-hidden" for="ar">{{t "col.year"}}</label>
+			<select id="ar" name="ar" onchange="this.form.submit()">
+				{{range .Data.Years}}<option value="{{.}}" {{if eq . $year}}selected{{end}}>{{.}}</option>{{end}}
+			</select>
+			<noscript><button type="submit" class="button small">{{t "show"}}</button></noscript>
+		</form>
+	</div>
+</div>
+
+<div class="stats">
+	<div class="stat"><strong>{{money .Data.Received}}</strong><span>{{t "fees.received" $year}}</span></div>
+	<div class="stat"><strong>{{money .Data.Counts.OwedKr}}</strong><span>{{t "fees.outstanding"}}</span></div>
+	<div class="stat"><strong>{{.Data.Counts.Paid}}</strong><span>{{t "fees.havepaid"}}</span></div>
+	<div class="stat {{if .Data.Counts.Overdue}}stat-bad{{end}}"><strong>{{.Data.Counts.Overdue}}</strong><span>{{t "stat.overdue"}}</span></div>
+</div>
+
+{{if .Data.Fee.Bankgiro}}
+<p class="note">{{t "fees.bankgiro" .Data.Fee.Bankgiro (money (fee "bo"))}}</p>
+{{end}}
+
+{{with .Data.Overdue}}
+<section class="panel panel-bad">
+	<div class="panel-head">
+		<h2>{{t "fees.chase" (len .)}}</h2>
+		<a class="quiet-link" href="{{query "/avgifter" "avgift" "overdue"}}">{{t "fees.chase.only"}}</a>
+	</div>
+	<p class="muted small">{{t "fees.chase.lede"}}</p>
+	<ul class="chase-list">
+		{{range .}}
+		<li>
+			<a href="/medlem/{{.Member.ID}}">{{.Member.Name}}</a>
+			<a class="quiet-link" href="mailto:{{.Member.Email}}">{{.Member.Email}}</a>
+			<span class="muted">{{t "fees.chase.due" (dateShort .DueBy)}}</span>
+			<span class="chip chip-{{.Member.Kind}}">{{t (printf "kind.%s" .Member.Kind)}}</span>
+		</li>
+		{{end}}
+	</ul>
+</section>
+{{end}}
+
+<section class="panel">
+	<h2 class="visually-hidden">{{t "filter.title"}}</h2>
+	<form method="get" action="/avgifter" class="filter-form">
+		<input type="hidden" name="ar" value="{{$year}}">
+		<div class="field grow">
+			<label for="sok">{{t "filter.search"}}</label>
+			<input id="sok" name="sok" type="search" value="{{$f.Query}}"
+			       placeholder="{{t "filter.search.hint"}}" autocomplete="off"
+			       data-table-filter="#fees">
+		</div>
+		<div class="field">
+			<label for="typ">{{t "filter.kind"}}</label>
+			<select id="typ" name="typ">
+				<option value="">{{t "all"}}</option>
+				{{range .Data.Kinds}}<option value="{{.Kind}}" {{if eq $f.Kind .Kind}}selected{{end}}>{{.Label}}</option>{{end}}
+			</select>
+		</div>
+		<div class="field">
+			<label for="avgift">{{t "filter.fee" $year}}</label>
+			<select id="avgift" name="avgift">
+				<option value="">{{t "all"}}</option>
+				<option value="paid" {{if eq $f.Fee "paid"}}selected{{end}}>{{t "fee.paid"}}</option>
+				<option value="due" {{if eq $f.Fee "due"}}selected{{end}}>{{t "fee.due"}}</option>
+				<option value="overdue" {{if eq $f.Fee "overdue"}}selected{{end}}>{{t "fee.overdue"}}</option>
+			</select>
+		</div>
+		<div class="filter-actions">
+			<button type="submit" class="button">{{t "filter.apply"}}</button>
+			{{if not $f.Empty}}<a class="button ghost" href="/avgifter?ar={{$year}}">{{t "filter.clear"}}</a>{{end}}
+			<a class="button ghost" href="{{.Data.ExportURL}}">{{t "filter.export"}}</a>
+		</div>
+	</form>
+</section>
+
+<section class="panel">
+	<div class="panel-head">
+		<h2>{{count "member" (len .Data.Rows)}}</h2>
+		{{if .May "pay"}}<p class="muted small">{{t "fees.tick"}}</p>{{end}}
+	</div>
+	{{if .Data.Rows}}
+	<div class="table-wrap">
+		<table class="table" id="fees">
+			<thead><tr>
+				{{template "sorthead" dict "Q" $q "Base" "/avgifter" "Key" "name" "Label" (t "col.name")}}
+				{{template "sorthead" dict "Q" $q "Base" "/avgifter" "Key" "kind" "Label" (t "col.kind")}}
+				{{template "sorthead" dict "Q" $q "Base" "/avgifter" "Key" "fee" "Label" (t "col.fee")}}
+				<th>{{t "col.amount"}}</th>
+				<th>{{t "col.paidon"}}</th>
+				<th class="right">{{if $.May "pay"}}{{t "col.record"}}{{end}}</th>
+			</tr></thead>
+			<tbody>
+				{{range .Data.Rows}}
+				<tr {{if not .Current}}class="is-former"{{end}}>
+					<td class="cell-name">
+						<a href="/medlem/{{.Member.ID}}">{{with .Member.Name}}{{.}}{{else}}{{t "noname"}}{{end}}</a>
+						<small class="muted">{{.Member.Email}}</small>
+					</td>
+					<td><span class="chip chip-{{.Member.Kind}}">{{t (printf "kind.%s" .Member.Kind)}}</span></td>
+					<td>{{template "feebadge" .}}</td>
+					<td>{{$kr := paidIn . $year}}{{if ge $kr 0}}{{money $kr}}{{else}}<span class="muted">–</span>{{end}}</td>
+					<td class="nowrap">{{if and .HasPaid (eq $year .Year)}}{{dateShort (local .Payment.PaidOn)}}{{else}}<span class="muted">–</span>{{end}}</td>
+					<td class="right">
+						{{if $.May "pay"}}
+						{{if ge (paidIn . $year) 0}}
+						<form method="post" action="/medlem/{{.Member.ID}}/angra-betalning" class="inline"
+						      data-confirm="{{t "member.fees.undo.confirm" .Member.Name $year}}">
+							<input type="hidden" name="ar" value="{{$year}}">
+							<input type="hidden" name="tillbaka" value="{{$.Here}}">
+							<button type="submit" class="link-button danger-text">{{t "member.fees.undo"}}</button>
+						</form>
+						{{else}}
+						<form method="post" action="/medlem/{{.Member.ID}}/betalning" class="inline pay-form">
+							<input type="hidden" name="ar" value="{{$year}}">
+							<input type="hidden" name="tillbaka" value="{{$.Here}}">
+							<input type="text" name="belopp" inputmode="numeric" class="tiny"
+							       value="{{fee .Member.Kind}}" aria-label="{{t "col.amount"}}">
+							<button type="submit" class="button small primary">{{t "member.fees.record"}}</button>
+						</form>
+						{{end}}
+						{{end}}
+					</td>
+				</tr>
+				{{end}}
+			</tbody>
+		</table>
+	</div>
+	<p class="empty" data-filter-empty hidden>{{t "register.nomatch"}}</p>
+	{{else}}
+	<p class="empty">{{t "register.nomatch"}}</p>
+	{{end}}
+</section>
+{{end}}
+{{template "base" .}}

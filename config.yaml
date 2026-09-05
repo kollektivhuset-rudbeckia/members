@@ -1,0 +1,144 @@
+# Kollektivhuset Rudbeckia – föreningens medlemsregister.
+#
+# Den här filen beskriver föreningen: vad avgiften är, vilka Google-grupper
+# och konton registret håller i takt, och vilket kalkylark kassörerna räknar
+# i. Servern läser filen vid start, så starta om containern efter en ändring.
+#
+# Ingenting hemligt står här. Lösenord, nycklar och adresser till konton som
+# får logga in sätts som miljövariabler — se .env.example.
+#
+# Kontrollera filen innan du startar om:  docker compose run --rm members -check-config
+
+site:
+  title: Rudbeckia medlemsregister
+  # Språket en besökare möts av innan hen väljer själv. "sv" eller "en".
+  # Var och en byter med flaggan uppe till höger, och valet minns i ett år.
+  language: sv
+  tagline: Kollektivhuset Rudbeckia
+  tagline_en: Rudbeckia housing co-operative
+  house_name: Kollektivhuset Rudbeckia
+  timezone: Europe/Stockholm
+  home_url: https://rudbeckia.nu
+  support_url: https://rudbeckia.nu/kontakt/
+  footer_note: Kollektivhuset Rudbeckia · Rosendal, Uppsala
+  footer_note_en: Rudbeckia housing co-operative · Rosendal, Uppsala
+
+membership:
+  # Årsavgiften i hela kronor. Avgiften löper per kalenderår: en betalning
+  # täcker januari till december.
+  fee_kr: 200
+  # Sätt bara den här om vänmedlemmar betalar något annat än bomedlemmar.
+  # 0 betyder samma avgift för båda.
+  fee_kr_van: 0
+  bankgiro: "000-0000"
+  payment_reference: "Medlemsavgift %s"
+
+  # Sista dagen att betala, som MM-DD. Årsmötet brukar ligga i mars.
+  due_on: "03-31"
+  # Hur länge efter sista dagen någon får vara i fred innan registret börjar
+  # kalla avgiften förfallen. En vecka eller två är lagom — det ska hinna
+  # bokföras innan någon får en påminnelse.
+  grace_days: 14
+  # Hur många dagar en ny medlem får på sig, räknat från dagen hen skrevs in.
+  # Det är den här raden som gör att man kan lägga in någon så fort hen visat
+  # intresse utan att hen är röd i registret samma eftermiddag. Är den satt
+  # till 45 hörs det av sig efter ungefär sex veckor.
+  new_member_days: 45
+
+# --------------------------------------------------------------------------
+# Google-grupperna. En medlem hör hemma i exakt en av dem, och vilken avgörs
+# av medlemstypen. Registret bestämmer vilka adresser som ska ligga där.
+# --------------------------------------------------------------------------
+groups:
+  - kind: bo
+    name: Bomedlemmar
+    email: bomedlemmar@rudbeckia.nu
+    role: MEMBER
+    # Registret äger gruppen: adresser som inte finns i registret tas bort.
+    prune: true
+    # ...utom de här. En grupp innehåller alltid några saker som inte är
+    # medlemmar, och att tappa en av dem till en ivrig synk vore en riktigt
+    # trist eftermiddag. Föreningens egna konton och den som Google kallar
+    # ägare eller manager skyddas automatiskt och behöver inte stå med.
+    #
+    # Matlagsledarna nedan är personer som funnits i gruppen utan att stå i
+    # kontaktregistret. Skriv in dem som medlemmar när ni vet vilka de är —
+    # då kan raderna tas bort härifrån.
+    keep:
+      - admin@rudbeckia.nu
+      - kontakt@rudbeckia.nu
+      - valberedningen@rudbeckia.nu
+      - nagon@example.com
+      - redacted@example.invalid
+      - redacted@example.invalid
+      - redacted@example.invalid
+      - redacted@example.invalid
+      - redacted@example.invalid
+      - redacted@example.invalid
+
+  - kind: van
+    name: Vänmedlemmar
+    email: friends@rudbeckia.nu
+    role: MEMBER
+    prune: true
+    keep:
+      - admin@rudbeckia.nu
+      - kontakt@rudbeckia.nu
+      - valberedningen@rudbeckia.nu
+
+# --------------------------------------------------------------------------
+# Kontaktspeglingen. Varje konto här får registret kopierat till sin egen
+# adressbok, under en etikett per medlemstyp, så att styrelsen når medlemmar
+# från telefonen. Bara kontakter inne i etiketterna rörs — det som kontots
+# ägare själv lagt in ser registret aldrig.
+#
+# Etikettnamnen är desamma som Apps Script-et använt hittills, så registret
+# hittar de kontakter som redan finns i stället för att göra nya.
+# --------------------------------------------------------------------------
+contacts:
+  accounts:
+    - ny@rudbeckia.nu
+    - styrelsen@rudbeckia.nu
+    - ekonomi@rudbeckia.nu
+  labels:
+    bo: Bomedlemmar
+    van: Vänmedlemmar
+  prune: true
+
+# --------------------------------------------------------------------------
+# Kalkylarket kassörerna räknar i. Registret äger fliken och skriver om den
+# vid varje körning, så skriv ingenting där själv — lägg era egna formler på
+# en annan flik som läser från den här.
+#
+# id är den långa strängen ur adressen:
+#   docs.google.com/spreadsheets/d/DET_HÄR/edit
+# Lämna tomt för att stänga av kalkylarksynken.
+# --------------------------------------------------------------------------
+sheet:
+  id: ""
+  tab: Medlemmar
+  # Så här många år tillbaka får en egen kolumn med inbetalda kronor.
+  years: 5
+
+sync:
+  # Hur ofta allt jämförs med Google.
+  interval_minutes: 10
+  # Hur länge en ändring väntar in sina grannar innan den knuffar igång en
+  # körning, så att fyra medlemmar inlagda i rad blir en synk och inte fyra.
+  settle_seconds: 5
+  # Hur länge en adress får misslyckas innan den röda bannern går på. Något
+  # som rättar sig själv vid nästa körning var aldrig värt ett larm.
+  alert_after_minutes: 30
+  # Domäner där en punkt i adressens första del inte betyder någonting, så
+  # att anna.andersson@ och annaandersson@ är samma brevlåda.
+  #
+  # Google struntar i punkter på alla domäner det självt är värd, och gör man
+  # inte likadant kommer registret att försöka lägga till en adress Google
+  # redan har, om och om igen, och rapportera en fullt fungerande medlem som
+  # trasig. Workspace-domänen läggs till automatiskt.
+  #
+  # Lägg *inte* till hotmail.com eller liknande: där är a.b@ och ab@ verkligen
+  # två olika personer, och att slå ihop dem vore värre än att hålla isär dem.
+  dot_fold_domains:
+    - gmail.com
+    - googlemail.com

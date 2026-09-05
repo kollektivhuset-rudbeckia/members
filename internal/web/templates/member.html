@@ -1,0 +1,220 @@
+{{define "content"}}
+{{$m := .Data.Member}}
+{{$s := .Data.Status}}
+{{$pending := .Data.Pending}}
+
+<nav class="crumbs">
+	<a href="/">{{t "nav.register"}}</a><span aria-hidden="true">›</span>{{with $m.Name}}{{.}}{{else}}{{t "noname"}}{{end}}
+</nav>
+
+<header class="hero hero-row">
+	<div>
+		<h1>{{with $m.Name}}{{.}}{{else}}{{t "noname"}}{{end}}</h1>
+		<p class="lede">
+			<span class="chip chip-{{$m.Kind}}">{{t (printf "kind.%s" $m.Kind)}}</span>
+			{{template "feebadge" $s}}
+			{{if not $s.Current}}<span class="badge badge-quiet">{{t "member.left" (dateShort (local $m.LeftOn.Time))}}</span>{{end}}
+		</p>
+	</div>
+	<div class="hero-actions">
+		{{if .May "edit"}}
+		<a class="button" href="#andra">{{t "member.edit"}}</a>
+		{{else if .May "propose"}}
+		<a class="button" href="#andra">{{t "member.propose"}}</a>
+		{{end}}
+	</div>
+</header>
+
+{{if $pending}}
+<aside class="alert alert-warn">
+	<strong>{{t "member.pending"}}</strong>
+	{{t "member.pending.body" $pending.ProposedBy (stamp (local $pending.ProposedAt))}}
+	<a href="/andringar">{{t "member.pending.see"}}</a>
+</aside>
+{{end}}
+
+<div class="columns">
+<div class="column">
+
+<section class="panel">
+	<div class="panel-head"><h2>{{t "member.about"}}</h2></div>
+	<dl class="facts-list">
+		<div><dt>{{t "form.email"}}</dt><dd><a href="mailto:{{$m.Email}}">{{$m.Email}}</a></dd></div>
+		<div><dt>{{t "form.phone"}}</dt><dd>{{with $m.Phone}}<a href="tel:{{.}}">{{.}}</a>{{else}}<span class="muted">–</span>{{end}}</dd></div>
+		{{if eq (printf "%s" $m.Kind) "bo"}}
+		<div><dt>{{t "form.apartment"}}</dt><dd>{{with $m.Apartment}}{{.}}{{else}}<span class="muted">–</span>{{end}}</dd></div>
+		{{end}}
+		<div><dt>{{t "form.joined"}}</dt><dd>{{dateLong (local $m.JoinedOn)}}</dd></div>
+		<div><dt>{{t "member.tenure"}}</dt><dd><strong>{{tenure $s.Years $s.Months}}</strong></dd></div>
+		{{if not $s.Current}}
+		<div><dt>{{t "form.left"}}</dt><dd>{{dateLong (local $m.LeftOn.Time)}}</dd></div>
+		{{end}}
+		<div><dt>{{t "member.group"}}</dt><dd>{{with .Data.Group}}<code>{{.}}</code>{{else}}<span class="muted">–</span>{{end}}</dd></div>
+		{{with $m.Note}}<div><dt>{{t "form.note"}}</dt><dd>{{.}}</dd></div>{{end}}
+	</dl>
+</section>
+
+<section class="panel" id="avgifter">
+	<div class="panel-head">
+		<h2>{{t "member.fees"}}</h2>
+		<span class="muted small">{{t "member.fees.each" (money (fee $m.Kind))}}</span>
+	</div>
+
+	{{if not (.May "pay")}}
+	<p class="hint">{{t "member.fees.cashieronly" (account "cashier")}}</p>
+	{{end}}
+
+	<div class="table-wrap">
+		<table class="table">
+			<thead><tr>
+				<th>{{t "col.year"}}</th><th>{{t "col.amount"}}</th><th>{{t "col.paidon"}}</th>
+				<th>{{t "col.method"}}</th><th>{{t "col.registeredby"}}</th><th></th>
+			</tr></thead>
+			<tbody>
+				{{range .Data.Years}}
+				{{$p := payment $.Data.Payments .}}
+				<tr>
+					<td><strong>{{.}}</strong></td>
+					{{if $p}}
+					<td>{{money $p.AmountKr}}</td>
+					<td class="nowrap">{{dateShort (local $p.PaidOn)}}</td>
+					<td>{{with $p.Method}}{{.}}{{else}}<span class="muted">–</span>{{end}}</td>
+					<td><small class="muted">{{$p.RegisteredBy}}</small></td>
+					<td class="right">
+						{{if $.May "pay"}}
+						<form method="post" action="/medlem/{{$m.ID}}/angra-betalning" class="inline"
+						      data-confirm="{{t "member.fees.undo.confirm" $m.Name .}}">
+							<input type="hidden" name="ar" value="{{.}}">
+							<button type="submit" class="link-button danger-text">{{t "member.fees.undo"}}</button>
+						</form>
+						{{end}}
+					</td>
+					{{else}}
+					<td colspan="4"><span class="muted">{{t "member.fees.nothing"}}</span></td>
+					<td class="right">
+						{{if $.May "pay"}}
+						<form method="post" action="/medlem/{{$m.ID}}/betalning" class="inline pay-form">
+							<input type="hidden" name="ar" value="{{.}}">
+							<input type="text" name="belopp" inputmode="numeric" class="tiny"
+							       value="{{fee $m.Kind}}" aria-label="{{t "col.amount"}}">
+							<input type="date" name="datum" class="tiny"
+							       value="{{isoDate $.Now}}" aria-label="{{t "col.paidon"}}">
+							<button type="submit" class="button small primary">{{t "member.fees.record"}}</button>
+						</form>
+						{{end}}
+					</td>
+					{{end}}
+				</tr>
+				{{end}}
+			</tbody>
+		</table>
+	</div>
+</section>
+
+<section class="panel" id="andra">
+	<div class="panel-head">
+		<h2>{{if .May "edit"}}{{t "member.edit"}}{{else}}{{t "member.propose"}}{{end}}</h2>
+	</div>
+
+	{{if .Data.Form.Bad}}<p class="alert alert-error" role="alert">{{t "form.check"}}</p>{{end}}
+
+	{{if $pending}}
+	<p class="alert alert-warn">{{t "member.pending.blocked"}}</p>
+	{{else}}
+	<form method="post" action="/medlem/{{$m.ID}}">
+		{{template "memberfields" .Data}}
+		{{if .NeedsApproval "edit"}}
+		<div class="field field-wide">
+			<label for="anledning">{{t "form.reason"}}</label>
+			<input id="anledning" name="anledning" type="text" maxlength="300"
+			       placeholder="{{t "form.reason.hint"}}">
+			<small class="hint">{{t "form.reason.why" (account "board")}}</small>
+		</div>
+		{{end}}
+		<div class="form-actions">
+			<button type="submit" class="button primary">
+				{{if .NeedsApproval "edit"}}{{t "member.propose.submit"}}{{else}}{{t "member.save"}}{{end}}
+			</button>
+			<a class="button ghost" href="/medlem/{{$m.ID}}">{{t "cancel"}}</a>
+		</div>
+	</form>
+
+	<hr class="rule">
+
+	<form method="post" action="/medlem/{{$m.ID}}/ta-bort" class="danger-zone"
+	      data-confirm="{{if .May "delete"}}{{t "member.delete.confirm" $m.Name}}{{else}}{{t "member.delete.propose.confirm" $m.Name}}{{end}}">
+		<h3>{{if .May "delete"}}{{t "member.delete"}}{{else}}{{t "member.delete.propose"}}{{end}}</h3>
+		<p class="hint">{{if .May "delete"}}{{t "member.delete.hint"}}{{else}}{{t "member.delete.propose.hint" (account "board")}}{{end}}</p>
+		{{if .NeedsApproval "delete"}}
+		<input type="text" name="anledning" maxlength="300" placeholder="{{t "form.reason.hint"}}">
+		{{end}}
+		<button type="submit" class="button danger">
+			{{if .May "delete"}}{{t "member.delete"}}{{else}}{{t "member.delete.propose"}}{{end}}
+		</button>
+	</form>
+	{{end}}
+</section>
+
+</div>
+<aside class="column column-side">
+
+<section class="panel">
+	<div class="panel-head"><h2>{{t "member.sync"}}</h2></div>
+	{{if .Data.Sync}}
+	<ul class="sync-list">
+		{{range .Data.Sync}}
+		<li class="{{if .OK}}is-ok{{else}}is-bad{{end}}">
+			<span class="dot" aria-hidden="true"></span>
+			<div>
+				<strong>{{t (printf "target.%s" .Kind)}} {{.Subject}}</strong>
+				{{if .OK}}
+					<small class="muted">{{t "member.sync.ok" (stamp (local .LastTry))}}</small>
+				{{else}}
+					<small class="danger-text">{{.Message}}</small>
+					{{if .FailingSince.Valid}}<small class="muted">{{t "member.sync.since" (since (local .FailingSince.Time) $.Now)}}</small>{{end}}
+				{{end}}
+			</div>
+		</li>
+		{{end}}
+	</ul>
+	{{else}}
+	<p class="muted small">{{t "member.sync.none"}}</p>
+	{{end}}
+	<p class="small"><a class="quiet-link" href="/synk">{{t "member.sync.all"}}</a></p>
+</section>
+
+{{with .Data.Proposals}}
+<section class="panel">
+	<div class="panel-head"><h2>{{t "member.proposals"}}</h2></div>
+	<ul class="timeline">
+		{{range .}}
+		<li>
+			<span class="badge badge-{{proposalTone .Status}}">{{t (printf "proposal.%s" .Status)}}</span>
+			<strong>{{t (printf "proposal.kind.%s" .Kind)}}</strong>
+			<small class="muted">{{.ProposedBy}} · {{stamp (local .ProposedAt)}}</small>
+			{{with .Reason}}<small>{{.}}</small>{{end}}
+		</li>
+		{{end}}
+	</ul>
+</section>
+{{end}}
+
+{{with .Data.Trail}}
+<section class="panel">
+	<div class="panel-head"><h2>{{t "member.history"}}</h2></div>
+	<ul class="timeline">
+		{{range .}}
+		<li>
+			<strong>{{t (printf "audit.%s" .Action)}}</strong>
+			<small class="muted">{{.Actor}} · {{stamp (local .At)}}</small>
+			{{with .Detail}}<small>{{.}}</small>{{end}}
+		</li>
+		{{end}}
+	</ul>
+</section>
+{{end}}
+
+</aside>
+</div>
+{{end}}
+{{template "base" .}}
