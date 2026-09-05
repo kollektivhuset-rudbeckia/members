@@ -1,0 +1,103 @@
+{{define "content"}}
+{{$d := .Data}}{{$f := $d.Form}}
+<div class="narrow join">
+
+<header class="hero">
+	<h1>{{t "join.title"}}</h1>
+	<p class="lede">{{t "join.lede"}}</p>
+</header>
+
+<section class="panel">
+	<h2>{{t "join.what"}}</h2>
+	<ul class="benefits">
+		<li><strong>{{t "join.what.dinner"}}</strong><span>{{t "join.what.dinner.body"}}</span></li>
+		<li><strong>{{t "join.what.queue"}}</strong><span>{{t "join.what.queue.body"}}</span></li>
+		<li><strong>{{t "join.what.house"}}</strong><span>{{t "join.what.house.body"}}</span></li>
+	</ul>
+	<p class="hint">{{t "join.what.more" .Site.HomeURL}}</p>
+</section>
+
+<section class="panel">
+	<h2>{{t "join.kinds"}}</h2>
+	<dl class="facts-list">
+		<div><dt>{{t "kind.bo"}}</dt><dd>{{t "join.kind.bo"}}</dd></div>
+		<div><dt>{{t "kind.van"}}</dt><dd>{{t "join.kind.van"}}</dd></div>
+	</dl>
+</section>
+
+<section class="panel">
+	<h2>{{t "join.cost"}}</h2>
+	<p class="price"><strong>{{money $d.FeeBo}}</strong> <span>{{t "join.cost.year" $d.Year}}</span></p>
+	{{if $d.FeeChanges}}<p class="hint">{{t "join.cost.next" $d.NextYear (money $d.FeeNext)}}</p>{{end}}
+	<p class="hint">{{t "join.cost.when"}}</p>
+	<p class="hint">{{t "join.cost.how"}}</p>
+</section>
+
+<section class="panel" id="anmal">
+	<h2>{{t "join.form"}}</h2>
+	<p class="muted">{{t "join.form.lede"}}</p>
+
+	{{with $f.Err "form"}}<p class="alert alert-error" role="alert">{{t .}}</p>{{end}}
+	{{if $f.Bad}}<p class="alert alert-error" role="alert">{{t "form.check"}}</p>{{end}}
+
+	<form method="post" action="/bli-medlem">
+		{{/* A field nobody can see. A person never fills it in; a robot that
+		     fills every input does, and the submission is discarded. */}}
+		<div class="honey" aria-hidden="true">
+			<label for="hemsida">{{t "join.honeypot"}}</label>
+			<input id="hemsida" name="hemsida" type="text" tabindex="-1" autocomplete="off">
+		</div>
+
+		<div class="field-grid">
+			<div class="field">
+				<label for="fornamn">{{t "form.firstname"}}</label>
+				<input id="fornamn" name="fornamn" type="text" value="{{$f.FirstName}}"
+				       autocomplete="given-name" required maxlength="200">
+			</div>
+			<div class="field">
+				<label for="efternamn">{{t "form.lastname"}}</label>
+				<input id="efternamn" name="efternamn" type="text" value="{{$f.LastName}}"
+				       autocomplete="family-name" maxlength="200">
+				{{with $f.Err "name"}}<small class="field-error">{{t .}}</small>{{end}}
+			</div>
+			<div class="field field-wide">
+				<label for="epost">{{t "form.email"}}</label>
+				<input id="epost" name="epost" type="email" value="{{$f.Email}}"
+				       autocomplete="email" spellcheck="false" autocapitalize="none"
+				       required maxlength="200">
+				<small class="hint">{{t "join.email.hint"}}</small>
+				{{with $f.Err "email"}}<small class="field-error">{{t .}}</small>{{end}}
+			</div>
+			<div class="field">
+				<label for="telefon">{{t "form.phone"}} <small>{{t "optional"}}</small></label>
+				<input id="telefon" name="telefon" type="tel" value="{{$f.Phone}}"
+				       autocomplete="tel" maxlength="200">
+			</div>
+			<div class="field">
+				<label for="typ">{{t "join.wanting"}}</label>
+				<select id="typ" name="typ">
+					{{range $d.Kinds}}
+					<option value="{{.Kind}}" {{if eq $f.Kind (printf "%s" .Kind)}}selected{{end}}>{{.Label}}</option>
+					{{end}}
+				</select>
+				<small class="hint">{{t "join.wanting.hint"}}</small>
+				{{with $f.Err "kind"}}<small class="field-error">{{t .}}</small>{{end}}
+			</div>
+			<div class="field field-wide">
+				<label for="meddelande">{{t "join.message"}} <small>{{t "optional"}}</small></label>
+				<textarea id="meddelande" name="meddelande" rows="4" maxlength="2000"
+				          placeholder="{{t "join.message.hint"}}">{{$f.Message}}</textarea>
+				{{with $f.Err "message"}}<small class="field-error">{{t .}}</small>{{end}}
+			</div>
+		</div>
+
+		<div class="form-actions">
+			<button type="submit" class="button primary">{{t "join.submit"}}</button>
+		</div>
+		<p class="hint privacy">{{t "join.privacy" $d.Contact}}</p>
+	</form>
+</section>
+
+</div>
+{{end}}
+{{template "base" .}}

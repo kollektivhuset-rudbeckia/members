@@ -62,6 +62,7 @@ type Server struct {
 var pages = []string{
 	"index.html", "login.html", "error.html", "member.html", "new.html",
 	"payments.html", "proposals.html", "sync.html", "log.html",
+	"join.html", "thanks.html", "pipeline.html",
 }
 
 // layouts are included in every page set.
@@ -111,6 +112,12 @@ func (s *Server) Handler() http.Handler {
 		w.Write([]byte("ok\n"))
 	})
 
+	// --- the only pages anybody on the internet may see ---
+	mux.HandleFunc("GET /bli-medlem", s.handleJoinForm)
+	mux.HandleFunc("POST /bli-medlem", s.handleJoin)
+	mux.HandleFunc("GET /bli-medlem/tack", s.handleJoinThanks)
+	mux.HandleFunc("GET /bli-medlem/tack/{token}", s.handleJoinThanks)
+
 	mux.HandleFunc("GET /login", s.handleLoginPage)
 	mux.HandleFunc("GET /logga-in", s.handleSignInStart)
 	mux.HandleFunc("GET /oauth2/callback", s.handleCallback)
@@ -131,6 +138,12 @@ func (s *Server) Handler() http.Handler {
 
 	// --- the cashiers' page ---
 	mux.Handle("GET /avgifter", s.page(s.handlePayments))
+
+	// --- the interview team's board ---
+	mux.Handle("GET /kandidater", s.can(config.PermPipeline, s.handleCandidates))
+	mux.Handle("POST /kandidater/ny", s.can(config.PermPipeline, s.handleAddCandidate))
+	mux.Handle("POST /kandidater/{id}", s.can(config.PermPipeline, s.handleSaveCandidate))
+	mux.Handle("POST /kandidater/{id}/valkomna", s.can(config.PermPipeline, s.handleWelcomeCandidate))
 
 	// --- the board's approval queue ---
 	mux.Handle("GET /andringar", s.page(s.handleProposals))
@@ -224,6 +237,10 @@ type view struct {
 	Pending int
 	// Overdue is how many members owe this year's fee past their due date.
 	Overdue int
+	// Applying is how many people outside the association are waiting to hear
+	// back. It is on the badge in the top bar, because somebody who has sent
+	// a form and heard nothing is the worst thing this register can do.
+	Applying int
 
 	// SheetURL is the cashiers' spreadsheet, for the link in the top bar.
 	SheetURL string
@@ -297,6 +314,16 @@ func (s *Server) newView(r *http.Request, w http.ResponseWriter, session auth.Se
 	}
 	if v.Overdue, err = s.countOverdue(ctx); err != nil {
 		return nil, err
+	}
+	// Only for the people who can act on it; nobody else needs the number.
+	if s.rt.Access.May(session.Role, config.PermPipeline) {
+		open := make([]string, 0, len(s.cfg.Pipeline.Stages))
+		for _, st := range s.cfg.Pipeline.Open() {
+			open = append(open, st.ID)
+		}
+		if v.Applying, err = s.store.CountCandidatesIn(ctx, open); err != nil {
+			return nil, fmt.Errorf("count the candidates: %w", err)
+		}
 	}
 	return v, nil
 }

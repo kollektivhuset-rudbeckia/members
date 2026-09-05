@@ -394,6 +394,18 @@ func randomToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
+// Token returns a long random string, for an address that has to be
+// unguessable — the page that thanks somebody for applying and tells them how
+// to pay, which anybody with the link can open and nobody should be able to
+// find by counting.
+func Token() string {
+	b := make([]byte, 24)
+	if _, err := rand.Read(b); err != nil {
+		panic(fmt.Sprintf("crypto/rand unavailable: %v", err))
+	}
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
 // ID returns a random identifier, used for members and proposals. It is
 // URL-safe and short enough to read out over the phone if it ever has to be.
 func ID() string {

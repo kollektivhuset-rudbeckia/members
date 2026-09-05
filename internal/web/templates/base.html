@@ -50,6 +50,12 @@
 				{{t "nav.fees"}}
 				{{if .Overdue}}<span class="tag tag-warn" title="{{t "nav.fees.overdue" .Overdue}}">{{.Overdue}}</span>{{end}}
 			</a>
+			{{if .May "pipeline"}}
+			<a href="/kandidater" {{if hasPrefix .Path "/kandidater"}}aria-current="page"{{end}}>
+				{{t "nav.pipeline"}}
+				{{if .Applying}}<span class="tag tag-info" title="{{t "nav.pipeline.waiting" .Applying}}">{{.Applying}}</span>{{end}}
+			</a>
+			{{end}}
 			<a href="/andringar" {{if hasPrefix .Path "/andringar"}}aria-current="page"{{end}}>
 				{{t "nav.proposals"}}
 				{{if .Pending}}<span class="tag tag-info" title="{{t "nav.proposals.waiting" .Pending}}">{{.Pending}}</span>{{end}}

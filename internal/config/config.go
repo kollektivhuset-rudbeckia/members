@@ -50,6 +50,7 @@ type Config struct {
 	Groups     []Group    `yaml:"groups"`
 	Contacts   Contacts   `yaml:"contacts"`
 	Sheet      Sheet      `yaml:"sheet"`
+	Pipeline   Pipeline   `yaml:"pipeline"`
 	Sync       Sync       `yaml:"sync"`
 
 	location *time.Location
@@ -287,6 +288,68 @@ func (c Contacts) LabelFor(k Kind) string {
 // Enabled reports whether any account asked for a contacts mirror.
 func (c Contacts) Enabled() bool { return len(c.Accounts) > 0 }
 
+// Pipeline is how somebody travels from "I saw the house and wondered" to a
+// member, and who is looking after them on the way.
+//
+// It replaces a Focalboard board that lived in Mattermost until the free
+// version dropped the feature. The stages are configuration rather than code
+// because they are the interview team's own working practice, and a team that
+// wants a stage between two others should not need a release.
+type Pipeline struct {
+	Stages []Stage `yaml:"stages"`
+}
+
+// Stage is one column of the board.
+type Stage struct {
+	ID     string `yaml:"id"`
+	Name   string `yaml:"name"`
+	NameEN string `yaml:"name_en"`
+	// Closed marks a stage where somebody has stopped moving — welcomed, or
+	// turned down. The board folds these away by default; they are history
+	// rather than work.
+	Closed bool `yaml:"closed"`
+	// Entry is the stage a form from the public lands in. Exactly one stage
+	// has it.
+	Entry bool `yaml:"entry"`
+}
+
+// NameFor gives the stage's name in one language.
+func (s Stage) NameFor(lang string) string { return pick(lang, s.Name, s.NameEN) }
+
+// Stage finds one by id.
+func (p Pipeline) Stage(id string) (Stage, bool) {
+	for _, s := range p.Stages {
+		if s.ID == id {
+			return s, true
+		}
+	}
+	return Stage{}, false
+}
+
+// EntryStage is where a form from the public arrives.
+func (p Pipeline) EntryStage() string {
+	for _, s := range p.Stages {
+		if s.Entry {
+			return s.ID
+		}
+	}
+	if len(p.Stages) > 0 {
+		return p.Stages[0].ID
+	}
+	return "new"
+}
+
+// Open are the stages where somebody is still on their way.
+func (p Pipeline) Open() []Stage {
+	var out []Stage
+	for _, s := range p.Stages {
+		if !s.Closed {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 // Sheet is the spreadsheet the cashiers calculate in. The registry owns the
 // tab named here and overwrites it on every run, so nobody should type into
 // it — put formulas on a second tab that reads from this one.
@@ -522,6 +585,40 @@ func (c *Config) normalise() error {
 		}
 	}
 	c.Sheet.ID = strings.TrimSpace(c.Sheet.ID)
+
+	if len(c.Pipeline.Stages) == 0 {
+		// The stages the interview team already worked in, taken from the
+		// board they lost.
+		c.Pipeline.Stages = []Stage{
+			{ID: "new", Name: "Nya", NameEN: "New", Entry: true},
+			{ID: "interview", Name: "Bokad intervju", NameEN: "Interview booked"},
+			{ID: "limbo", Name: "Limbo", NameEN: "Limbo"},
+			{ID: "welcomed", Name: "Välkomnade", NameEN: "Welcomed", Closed: true},
+			{ID: "rejected", Name: "Tackat nej", NameEN: "Declined", Closed: true},
+		}
+	}
+	seenStage := map[string]bool{}
+	entries := 0
+	for i := range c.Pipeline.Stages {
+		st := &c.Pipeline.Stages[i]
+		st.ID = strings.ToLower(strings.TrimSpace(st.ID))
+		if st.ID == "" {
+			return fmt.Errorf("a pipeline stage has no id")
+		}
+		if seenStage[st.ID] {
+			return fmt.Errorf("two pipeline stages share the id %q", st.ID)
+		}
+		seenStage[st.ID] = true
+		if st.Name == "" {
+			st.Name = st.ID
+		}
+		if st.Entry {
+			entries++
+		}
+	}
+	if entries > 1 {
+		return fmt.Errorf("more than one pipeline stage is marked as the entry")
+	}
 
 	if c.Sync.MaxRemovalsPerRun == 0 {
 		c.Sync.MaxRemovalsPerRun = 5

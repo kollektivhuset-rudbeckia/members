@@ -1,7 +1,7 @@
 # Everyday commands. Run `make` on its own to see them.
 
 .DEFAULT_GOAL := help
-.PHONY: help demo demo-docker demo-stop run import import-dry test race vet fmt check build image clean
+.PHONY: help demo demo-docker demo-stop run import import-dry import-board test race vet fmt check build image clean
 
 BINARY  := members
 IMAGE   := members-rudbeckia
@@ -31,6 +31,10 @@ import-dry: ## Rehearse the migration: read the board's contacts, write nothing
 import: ## Do the migration. Set JOINED to the day to record, e.g. JOINED=2026-01-01
 	@test -n "$(JOINED)" || { echo "Set JOINED=YYYY-MM-DD — see 'make import-dry' first"; exit 1; }
 	go run ./cmd/server -import -import-joined=$(JOINED)
+
+import-board: ## Fill the candidate pipeline from a Focalboard export. BOARD=~/rudbeckia-candidates.txt
+	@test -n "$(BOARD)" || { echo "Set BOARD=path/to/export.txt"; exit 1; }
+	go run ./cmd/server -import-board=$(BOARD) $(if $(DRY),-dry-run,)
 
 test: ## Run the tests
 	go test ./...

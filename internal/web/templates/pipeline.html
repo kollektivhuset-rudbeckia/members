@@ -1,0 +1,183 @@
+{{define "content"}}
+<div class="hero hero-row">
+	<div>
+		<h1>{{t "pipeline.title"}}</h1>
+		<p class="lede">{{t "pipeline.lede"}}</p>
+		<p class="hint">{{t "pipeline.publicform"}} <a href="/bli-medlem">{{.Data.JoinURL}}</a></p>
+	</div>
+	<div class="hero-actions">
+		{{if .Data.ClosedSeen}}<a class="button ghost" href="/kandidater">{{t "pipeline.hideclosed"}}</a>
+		{{else}}<a class="button ghost" href="/kandidater?visa=alla">{{t "pipeline.showclosed" .Data.ClosedN}}</a>{{end}}
+		<a class="button" href="#ny">{{t "pipeline.add"}}</a>
+	</div>
+</div>
+
+<div class="board">
+	{{range .Data.Columns}}
+	<section class="board-column {{if .Stage.Closed}}is-closed{{end}}">
+		<header class="board-head">
+			<h2>{{.Name}}</h2>
+			<span class="tag">{{len .Candidates}}</span>
+		</header>
+
+		{{if .Candidates}}
+		<ul class="board-cards">
+			{{range .Candidates}}
+			{{$c := .Candidate}}
+			<li class="board-card">
+				<details>
+					<summary>
+						<strong>{{with $c.Name}}{{.}}{{else}}{{t "noname"}}{{end}}</strong>
+						<span class="card-meta">
+							{{with $c.Apartment}}<span class="chip">{{t "pipeline.apartment"}} {{.}}</span>{{end}}
+							{{if $c.InterviewOn.Valid}}<span class="chip chip-bo">{{dateShort (local $c.InterviewOn.Time)}}</span>{{end}}
+							{{if .Known}}<span class="chip chip-van">{{t "pipeline.ismember"}}</span>{{end}}
+						</span>
+						{{with $c.Responsible}}<small class="muted">{{t "pipeline.responsible"}} {{.}}</small>{{end}}
+					</summary>
+
+					<div class="card-body">
+						<dl class="facts-list">
+							{{with $c.Email}}<div><dt>{{t "form.email"}}</dt><dd><a href="mailto:{{.}}">{{.}}</a></dd></div>{{end}}
+							{{with $c.Phone}}<div><dt>{{t "form.phone"}}</dt><dd><a href="tel:{{.}}">{{.}}</a></dd></div>{{end}}
+							<div><dt>{{t "join.wanting"}}</dt><dd>{{t (printf "kind.%s" $c.Kind)}}</dd></div>
+							<div><dt>{{t "pipeline.source"}}</dt><dd>{{t (printf "pipeline.source.%s" $c.Source)}}</dd></div>
+							{{with $c.Message}}<div><dt>{{t "join.message"}}</dt><dd>{{.}}</dd></div>{{end}}
+							{{with $c.Note}}<div><dt>{{t "form.note"}}</dt><dd>{{.}}</dd></div>{{end}}
+						</dl>
+
+						{{if .Known}}
+						<p class="alert alert-warn">{{t "pipeline.already" .Member.Name}}
+							<a href="/medlem/{{.Member.ID}}">{{t "applications.already.see"}}</a></p>
+						{{end}}
+
+						<form method="post" action="/kandidater/{{$c.ID}}" class="card-edit">
+							<input type="hidden" name="hela" value="1">
+							<input type="hidden" name="tillbaka" value="{{$.Here}}">
+							<div class="field-grid">
+								<div class="field">
+									<label for="f-{{$c.ID}}">{{t "form.firstname"}}</label>
+									<input id="f-{{$c.ID}}" name="fornamn" type="text" value="{{$c.FirstName}}">
+								</div>
+								<div class="field">
+									<label for="e-{{$c.ID}}">{{t "form.lastname"}}</label>
+									<input id="e-{{$c.ID}}" name="efternamn" type="text" value="{{$c.LastName}}">
+								</div>
+								<div class="field">
+									<label for="m-{{$c.ID}}">{{t "form.email"}}</label>
+									<input id="m-{{$c.ID}}" name="epost" type="email" value="{{$c.Email}}">
+								</div>
+								<div class="field">
+									<label for="t-{{$c.ID}}">{{t "form.phone"}}</label>
+									<input id="t-{{$c.ID}}" name="telefon" type="tel" value="{{$c.Phone}}">
+								</div>
+								<div class="field">
+									<label for="l-{{$c.ID}}">{{t "pipeline.apartment"}}</label>
+									<input id="l-{{$c.ID}}" name="lagenhet" type="text" value="{{$c.Apartment}}">
+								</div>
+								<div class="field">
+									<label for="a-{{$c.ID}}">{{t "pipeline.responsible"}}</label>
+									<input id="a-{{$c.ID}}" name="ansvarig" type="text" value="{{$c.Responsible}}">
+								</div>
+								<div class="field">
+									<label for="i-{{$c.ID}}">{{t "pipeline.interview"}}</label>
+									<input id="i-{{$c.ID}}" name="intervju" type="date"
+									       value="{{if $c.InterviewOn.Valid}}{{isoDate (local $c.InterviewOn.Time)}}{{end}}">
+								</div>
+								<div class="field">
+									<label for="k-{{$c.ID}}">{{t "form.kind"}}</label>
+									<select id="k-{{$c.ID}}" name="typ">
+										{{range $.Data.Kinds}}<option value="{{.Kind}}" {{if eq $c.Kind .Kind}}selected{{end}}>{{.Label}}</option>{{end}}
+									</select>
+								</div>
+								<div class="field">
+									<label for="s-{{$c.ID}}">{{t "pipeline.stage"}}</label>
+									<select id="s-{{$c.ID}}" name="steg">
+										{{range $.Data.Stages}}<option value="{{.ID}}" {{if eq $c.Stage .ID}}selected{{end}}>{{.NameFor (printf "%s" $.Lang)}}</option>{{end}}
+									</select>
+								</div>
+								<div class="field field-wide">
+									<label for="n-{{$c.ID}}">{{t "form.note"}}</label>
+									<input id="n-{{$c.ID}}" name="anteckning" type="text" value="{{$c.Note}}" maxlength="500">
+								</div>
+							</div>
+							<div class="form-actions">
+								<button type="submit" class="button">{{t "pipeline.save"}}</button>
+							</div>
+						</form>
+
+						{{if and $c.Email (not .Known)}}
+						<form method="post" action="/kandidater/{{$c.ID}}/valkomna" class="inline-form card-welcome"
+						      data-confirm="{{t "pipeline.welcome.confirm" $c.Name}}">
+							<select name="typ" aria-label="{{t "form.kind"}}">
+								{{range $.Data.Kinds}}<option value="{{.Kind}}" {{if eq $c.Kind .Kind}}selected{{end}}>{{.Label}}</option>{{end}}
+							</select>
+							<button type="submit" class="button primary">{{t "pipeline.welcome"}}</button>
+						</form>
+						<p class="hint">{{t "pipeline.welcome.hint"}}</p>
+						{{else if not $c.Email}}
+						<p class="hint">{{t "pipeline.noemail"}}</p>
+						{{end}}
+					</div>
+				</details>
+			</li>
+			{{end}}
+		</ul>
+		{{else}}
+		<p class="board-empty">{{t "pipeline.emptycolumn"}}</p>
+		{{end}}
+	</section>
+	{{end}}
+</div>
+
+<section class="panel" id="ny">
+	<div class="panel-head"><h2>{{t "pipeline.add"}}</h2></div>
+	<p class="muted">{{t "pipeline.add.lede"}}</p>
+	<form method="post" action="/kandidater/ny">
+		<div class="field-grid">
+			<div class="field">
+				<label for="ny-fornamn">{{t "form.firstname"}}</label>
+				<input id="ny-fornamn" name="fornamn" type="text" required>
+			</div>
+			<div class="field">
+				<label for="ny-efternamn">{{t "form.lastname"}}</label>
+				<input id="ny-efternamn" name="efternamn" type="text">
+			</div>
+			<div class="field">
+				<label for="ny-epost">{{t "form.email"}}</label>
+				<input id="ny-epost" name="epost" type="email">
+			</div>
+			<div class="field">
+				<label for="ny-telefon">{{t "form.phone"}}</label>
+				<input id="ny-telefon" name="telefon" type="tel">
+			</div>
+			<div class="field">
+				<label for="ny-lagenhet">{{t "pipeline.apartment"}}</label>
+				<input id="ny-lagenhet" name="lagenhet" type="text">
+			</div>
+			<div class="field">
+				<label for="ny-ansvarig">{{t "pipeline.responsible"}}</label>
+				<input id="ny-ansvarig" name="ansvarig" type="text">
+			</div>
+			<div class="field">
+				<label for="ny-intervju">{{t "pipeline.interview"}}</label>
+				<input id="ny-intervju" name="intervju" type="date">
+			</div>
+			<div class="field">
+				<label for="ny-steg">{{t "pipeline.stage"}}</label>
+				<select id="ny-steg" name="steg">
+					{{range .Data.Stages}}<option value="{{.ID}}">{{.NameFor (printf "%s" $.Lang)}}</option>{{end}}
+				</select>
+			</div>
+			<div class="field field-wide">
+				<label for="ny-anteckning">{{t "form.note"}}</label>
+				<input id="ny-anteckning" name="anteckning" type="text" maxlength="500">
+			</div>
+		</div>
+		<div class="form-actions">
+			<button type="submit" class="button primary">{{t "pipeline.add"}}</button>
+		</div>
+	</form>
+</section>
+{{end}}
+{{template "base" .}}

@@ -56,6 +56,30 @@ CREATE TABLE IF NOT EXISTS members (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_members_email ON members (email);
 CREATE INDEX IF NOT EXISTS idx_members_kind ON members (kind, left_on);
 
+CREATE TABLE IF NOT EXISTS candidates (
+	id            TEXT PRIMARY KEY,
+	token         TEXT NOT NULL,
+	first_name    TEXT NOT NULL DEFAULT '',
+	last_name     TEXT NOT NULL DEFAULT '',
+	email         TEXT NOT NULL DEFAULT '',
+	phone         TEXT NOT NULL DEFAULT '',
+	apartment     TEXT NOT NULL DEFAULT '',
+	kind          TEXT NOT NULL DEFAULT 'van',
+	message       TEXT NOT NULL DEFAULT '',
+	stage         TEXT NOT NULL,
+	responsible   TEXT NOT NULL DEFAULT '',
+	interview_on  TEXT,
+	note          TEXT NOT NULL DEFAULT '',
+	source        TEXT NOT NULL DEFAULT '',
+	member_id     TEXT NOT NULL DEFAULT '',
+	created_at    TEXT NOT NULL,
+	created_ip    TEXT NOT NULL DEFAULT '',
+	moved_at      TEXT NOT NULL,
+	moved_by      TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_candidates_token ON candidates (token);
+CREATE INDEX IF NOT EXISTS idx_candidates_stage ON candidates (stage, created_at);
+
 CREATE TABLE IF NOT EXISTS payments (
 	member_id     TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
 	year          INTEGER NOT NULL,

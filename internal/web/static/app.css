@@ -611,3 +611,83 @@ code {
 @media (max-width: 44rem) {
 	.pager { justify-content: center; }
 }
+
+/* ---------- The public page ---------- */
+.join .panel { padding: 1.75rem; }
+.join h2 { font-size: 1.2rem; }
+.benefits { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
+.benefits li { display: flex; flex-direction: column; gap: .15rem; padding-left: 1rem; border-left: 3px solid var(--accent-line); }
+.benefits strong { font-weight: 600; }
+.benefits span { color: var(--text-muted); font-size: .92rem; }
+.price { margin: 0 0 .4rem; display: flex; align-items: baseline; gap: .5rem; }
+.price strong { font-size: 2.2rem; font-weight: 500; line-height: 1; color: var(--accent); }
+.price span { color: var(--text-muted); }
+.price-small { font-size: 1.3rem; font-weight: 500; color: var(--accent); }
+.steps-numbered { margin: 0; padding-left: 1.3rem; display: grid; gap: .5rem; color: var(--text-muted); }
+.steps-numbered li { padding-left: .25rem; }
+textarea {
+	width: 100%; font: inherit; font-size: .95rem; color: var(--text);
+	background: var(--bg); border: 1px solid var(--line);
+	border-radius: var(--radius-sm); padding: .55rem .7rem; resize: vertical;
+}
+textarea:hover { border-color: var(--base-300); }
+.privacy { margin-top: 1rem; }
+
+/* Off the page rather than display:none — a robot that skips hidden fields
+   would step around a hidden one, and this is meant to be filled in. */
+.honey {
+	position: absolute; left: -9999px; width: 1px; height: 1px;
+	overflow: hidden;
+}
+
+.pay-ways { display: grid; gap: 1.5rem; }
+@media (min-width: 46rem) {
+	.pay-ways { grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+}
+.pay-way { border: 1px solid var(--line); border-radius: var(--radius); padding: 1.15rem; background: var(--bg); }
+.pay-way h3 { margin: 0 0 .8rem; font-size: 1rem; }
+.qr {
+	display: block; width: 220px; height: 220px; max-width: 100%;
+	/* The code has to stay dark-on-light to scan, whatever the page theme. */
+	background: #fff; padding: .5rem; border-radius: var(--radius-sm);
+	image-rendering: pixelated;
+}
+.pay-facts { margin: .9rem 0 0; display: grid; gap: .4rem; font-size: .9rem; }
+.pay-facts > div { display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
+.pay-facts dt { color: var(--text-faint); font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; min-width: 7rem; }
+.pay-facts dd { margin: 0; overflow-wrap: anywhere; }
+.pay-facts.big dd strong { font-size: 1.1rem; font-family: var(--font-mono); }
+
+/* ---------- The candidate board ---------- */
+.board { display: grid; gap: 1.25rem; margin-bottom: 2rem; }
+@media (min-width: 62rem) {
+	.board { grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); align-items: start; }
+}
+.board-column {
+	background: var(--bg-soft); border: 1px solid var(--line);
+	border-radius: var(--radius-lg); padding: 1rem;
+}
+.board-column.is-closed { opacity: .75; }
+.board-head { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; margin-bottom: .8rem; }
+.board-head h2 { margin: 0; font-size: 1rem; }
+.board-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; }
+.board-card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); }
+.board-card summary {
+	cursor: pointer; padding: .7rem .85rem; display: flex; flex-direction: column; gap: .25rem;
+	list-style: none;
+}
+.board-card summary::-webkit-details-marker { display: none; }
+.board-card summary::before { content: "▸ "; color: var(--text-faint); }
+.board-card details[open] summary::before { content: "▾ "; }
+.board-card summary:hover { background: var(--bg-sunk); }
+.board-card summary strong { font-weight: 500; }
+.card-meta { display: flex; gap: .35rem; flex-wrap: wrap; }
+.card-body { padding: .3rem .85rem 1rem; border-top: 1px solid var(--line-soft); }
+.card-body .facts-list { margin: .8rem 0; font-size: .85rem; }
+.card-body .facts-list dt { flex-basis: 6.5rem; }
+.card-edit { margin-top: .8rem; padding-top: .8rem; border-top: 1px solid var(--line-soft); }
+.card-edit .field-grid { grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .6rem; }
+.card-edit .form-actions { margin-top: .8rem; }
+.card-welcome { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line-soft); }
+.board-empty { color: var(--text-faint); font-size: .85rem; margin: 0; padding: .5rem; }
+.proposal.is-settled { opacity: .65; }

@@ -1,0 +1,78 @@
+{{define "content"}}
+{{$d := .Data}}
+<div class="narrow join">
+
+{{if not $d.Known}}
+<header class="hero">
+	<h1>{{t "join.thanks.title"}}</h1>
+	<p class="lede">{{t "join.thanks.plain"}}</p>
+</header>
+<p><a class="button" href="/bli-medlem">{{t "join.thanks.back"}}</a></p>
+{{else}}
+{{$a := $d.Candidate}}{{$p := $d.Pay}}
+
+<header class="hero">
+	<h1>{{t "join.thanks.hi" $a.FirstName}}</h1>
+	<p class="lede">{{t "join.thanks.lede" $d.Contact}}</p>
+</header>
+
+<section class="panel">
+	<h2>{{t "join.thanks.next"}}</h2>
+	<ol class="steps-numbered">
+		<li>{{t "join.thanks.step.pay" (money $p.AmountKr)}}</li>
+		<li>{{t "join.thanks.step.read"}}</li>
+		<li>{{t "join.thanks.step.welcome"}}</li>
+	</ol>
+</section>
+
+<section class="panel">
+	<div class="panel-head">
+		<h2>{{t "join.pay"}}</h2>
+		<strong class="price-small">{{money $p.AmountKr}}</strong>
+	</div>
+
+	<div class="pay-ways">
+		{{if $p.Swish.Offered}}
+		<div class="pay-way">
+			<h3>{{t "join.pay.swish"}}</h3>
+			<img class="qr" src="{{pngData $p.Swish.QR}}" width="220" height="220"
+			     alt="{{t "join.pay.qr.alt" (money $p.AmountKr)}}">
+			<p class="hint">{{t "join.pay.qr.how"}}</p>
+			<dl class="pay-facts">
+				<div><dt>{{t "join.pay.number"}}</dt><dd><strong>{{$p.Swish.Number}}</strong></dd></div>
+				<div><dt>{{t "join.pay.amount"}}</dt><dd>{{money $p.AmountKr}}</dd></div>
+				<div><dt>{{t "join.pay.reference"}}</dt><dd>{{$p.Reference}}</dd></div>
+			</dl>
+		</div>
+		{{end}}
+
+		{{with $p.Bankgiro}}
+		<div class="pay-way">
+			<h3>{{t "join.pay.bankgiro"}}</h3>
+			<dl class="pay-facts big">
+				<div><dt>{{t "join.pay.bg"}}</dt><dd><strong>{{.}}</strong></dd></div>
+				<div><dt>{{t "join.pay.amount"}}</dt><dd><strong>{{money $p.AmountKr}}</strong></dd></div>
+				<div><dt>{{t "join.pay.reference"}}</dt><dd><strong>{{$p.Reference}}</strong></dd></div>
+			</dl>
+			<p class="hint">{{t "join.pay.reference.why"}}</p>
+		</div>
+		{{end}}
+	</div>
+</section>
+
+<section class="panel">
+	<h2>{{t "join.thanks.said"}}</h2>
+	<dl class="facts-list">
+		<div><dt>{{t "form.email"}}</dt><dd>{{$a.Email}}</dd></div>
+		{{with $a.Phone}}<div><dt>{{t "form.phone"}}</dt><dd>{{.}}</dd></div>{{end}}
+		<div><dt>{{t "join.wanting"}}</dt><dd>{{t (printf "kind.%s" $a.Kind)}}</dd></div>
+		{{with $a.Message}}<div><dt>{{t "join.message"}}</dt><dd>{{.}}</dd></div>{{end}}
+	</dl>
+	<p class="hint">{{t "join.thanks.wrong" $d.Contact}}</p>
+	<p class="hint">{{t "join.thanks.keep"}}</p>
+</section>
+{{end}}
+
+</div>
+{{end}}
+{{template "base" .}}

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -47,6 +48,8 @@ func main() {
 			"with -import: the day to record every imported member as having joined (YYYY-MM-DD)")
 		importNote = flag.String("import-note", "Importerad från Google Kontakter",
 			"with -import: the note written on every imported member")
+		importBoard = flag.String("import-board", "",
+			"read a Focalboard candidate export and fill the pipeline from it, then exit")
 	)
 	flag.Parse()
 
@@ -66,6 +69,14 @@ func main() {
 	if *checkConfig {
 		if err := check(log); err != nil {
 			log.Error("the configuration is not valid", "err", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if *importBoard != "" {
+		if err := runBoardImport(log, *importBoard, *dryRun); err != nil {
+			log.Error("the board import failed", "err", err)
 			os.Exit(1)
 		}
 		return
@@ -212,6 +223,84 @@ func runImport(log *slog.Logger, opts importer.Options, joined string) error {
 	}
 	fmt.Printf("\nImporterade %d medlemmar.\n", result.Imported)
 	return nil
+}
+
+// runBoardImport fills the candidate pipeline from the Focalboard export.
+//
+// It needs no Google at all: the board is a plain file and the pipeline is
+// the register's own. That makes it the one import somebody can rehearse on a
+// laptop before it touches the server.
+func runBoardImport(log *slog.Logger, path string, dryRun bool) error {
+	rt, err := config.LoadRuntime()
+	if err != nil {
+		return err
+	}
+	cfg, err := config.Load(rt.ConfigPath)
+	if err != nil {
+		return err
+	}
+	cfg.WithHostedDomain(rt.Google.HostedDomain)
+
+	st, err := store.Open(rt.DBPath)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("open the export: %w", err)
+	}
+	defer f.Close()
+
+	actor := rt.AccountFor(config.RoleIntake)
+	result, err := importer.ImportBoard(context.Background(), st, cfg, f, dryRun, actor)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("\nLäste %s\n", path)
+	fmt.Printf("\n  Rubrikerna i filen blev de här stegen:\n")
+	headings := make([]string, 0, len(result.Stages))
+	for h := range result.Stages {
+		headings = append(headings, h)
+	}
+	sort.Strings(headings)
+	for _, h := range headings {
+		fmt.Printf("    %-36s → %s\n", h, result.Stages[h])
+	}
+
+	reportRows("Kan läggas till", result.Ready())
+	reportRows("Finns redan på tavlan", result.Skipped())
+	reportRows("Hoppas över, redan ur processen", result.Settled())
+	reportRows("Värt en titt, men läggs till", result.Warnings())
+	reportRows("Kan inte läggas till", result.Problems())
+
+	if result.DryRun {
+		fmt.Printf("\nIngenting skrevs. Kör om utan -dry-run för att lägga till %d kandidater.\n",
+			len(result.Ready()))
+		return nil
+	}
+	fmt.Printf("\nLade till %d kandidater.\n", result.Imported)
+	return nil
+}
+
+func reportRows(heading string, list []importer.CandidateRow) {
+	fmt.Printf("\n  %s — %d st.\n", heading, len(list))
+	for _, c := range list {
+		name := c.Name
+		if name == "" {
+			name = "(utan namn)"
+		}
+		line := fmt.Sprintf("    %-30s %-34s %-10s %s", name, c.Email, c.Stage, c.Apartment)
+		switch {
+		case c.Problem != "":
+			line += "  ← " + c.Problem
+		case c.Warning != "":
+			line += "  ← " + c.Warning
+		}
+		fmt.Println(strings.TrimRight(line, " "))
+	}
 }
 
 func report(heading string, list []importer.Candidate) {

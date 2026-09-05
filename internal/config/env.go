@@ -77,6 +77,14 @@ const (
 	PermPay Permission = "pay"
 	// PermSync starts a reconciliation by hand.
 	PermSync Permission = "sync"
+	// PermPipeline sees and works the candidate board.
+	//
+	// It is the interview team's own working notes about people who have not
+	// agreed to anything yet — what they said about themselves, who is
+	// looking after them, whether they were turned down. That is ny@'s
+	// business and the board's, and nobody else's; the cashier has no reason
+	// to read it and every reason not to have to.
+	PermPipeline Permission = "pipeline"
 )
 
 // Access is the permission matrix, resolved once at startup so that a page, a
@@ -92,6 +100,7 @@ const (
 //	fee paid or not    ✗         ✓          ✗ (see PaymentRoles)
 //	decide proposals   ✗         ✗          ✓
 //	sync by hand       ✗         ✗          ✓
+//	the candidates     ✓         ✗          ✓
 type Access struct {
 	// PaymentRoles are the roles that may touch a payment. The house asked
 	// for this to be the cashier alone — they are the one with the bank
@@ -112,6 +121,8 @@ func (a Access) May(r Role, p Permission) bool {
 		return a.PaymentRoles[r]
 	case PermEdit:
 		return r == RoleBoard || r == RoleCashier
+	case PermPipeline:
+		return r == RoleIntake || r == RoleBoard
 	case PermDelete, PermApprove, PermSync:
 		return r == RoleBoard
 	case PermPropose:

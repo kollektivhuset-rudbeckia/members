@@ -49,8 +49,12 @@ type Member struct {
 }
 
 // Name is how the member is written on a page and in a contact card.
-func (m Member) Name() string {
-	return strings.TrimSpace(strings.TrimSpace(m.FirstName) + " " + strings.TrimSpace(m.LastName))
+func (m Member) Name() string { return joinName(m.FirstName, m.LastName) }
+
+// joinName puts a first and last name together, tolerating either being
+// missing — plenty of contact cards carry only one.
+func joinName(first, last string) string {
+	return strings.TrimSpace(strings.TrimSpace(first) + " " + strings.TrimSpace(last))
 }
 
 // Current reports whether the membership is still running.

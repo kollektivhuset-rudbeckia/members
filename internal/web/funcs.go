@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/base64"
 	"html/template"
 	"net/url"
 	"strings"
@@ -106,6 +107,26 @@ func (s *Server) funcs(lang i18n.Lang) template.FuncMap {
 				return template.URL(base)
 			}
 			return template.URL(base + "?" + q.Encode())
+		},
+
+		// pngData lets an inline QR code through the template escaper.
+		//
+		// html/template rewrites any src it does not recognise to
+		// "#ZgotmplZ", which is the right default and exactly what stopped
+		// the Swish code from rendering. Rather than mark the whole value
+		// trusted at the point it is built, it is checked here: anything that
+		// is not a base64 PNG data URI comes back empty and the image is
+		// simply missing, which is a far better failure than a page that will
+		// render whatever a URL happens to say.
+		"pngData": func(uri string) template.URL {
+			const prefix = "data:image/png;base64,"
+			if !strings.HasPrefix(uri, prefix) {
+				return ""
+			}
+			if _, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(uri, prefix)); err != nil {
+				return ""
+			}
+			return template.URL(uri)
 		},
 
 		"dict":      dict,
