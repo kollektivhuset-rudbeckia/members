@@ -108,7 +108,7 @@ och `profile`, som är förvalda.
 | Application type | **Web application** |
 | Name | `members` |
 | Authorized JavaScript origins | *(lämna tom — registret kör ingen JavaScript mot Google)* |
-| Authorized redirect URIs | `https://medlemmar.rudbeckia.nu/oauth2/callback` |
+| Authorized redirect URIs | `https://members.rudbeckia.nu/oauth2/callback` |
 
 Lägg till `http://localhost:8080/oauth2/callback` också om du vill kunna köra
 skarpt läge lokalt.
@@ -124,7 +124,7 @@ Kopiera **Client ID** och **Client secret** till `.env`:
 ```bash
 GOOGLE_CLIENT_ID=1234567890-abc....apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-....
-BASE_URL=https://medlemmar.rudbeckia.nu
+BASE_URL=https://members.rudbeckia.nu
 GOOGLE_HOSTED_DOMAIN=rudbeckia.nu
 ```
 

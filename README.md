@@ -78,7 +78,7 @@ hör till organisationen:
 3. Under **Authorized redirect URIs**, lägg till exakt:
 
    ```
-   https://medlemmar.rudbeckia.nu/oauth2/callback
+   https://members.rudbeckia.nu/oauth2/callback
    ```
 
    Adressen måste vara `BASE_URL` + `/oauth2/callback`, tecken för tecken.
@@ -471,7 +471,7 @@ tillbaka webbläsaren och om sessionskakan sätts som `Secure` (den blir det nä
 adressen är `https://`). Exempel för Caddy:
 
 ```
-medlemmar.rudbeckia.nu {
+members.rudbeckia.nu {
     reverse_proxy members:8080
 }
 ```

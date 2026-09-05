@@ -79,7 +79,7 @@ sudo chmod 600 secrets/service-account.json
 En rad ska ändras, och en bör läggas till:
 
 ```bash
-BASE_URL=https://medlemmar.rudbeckia.nu    # inte localhost
+BASE_URL=https://members.rudbeckia.nu    # inte localhost
 SESSION_SECRET=<slumpa en>                  # annars loggas alla ut vid varje deploy
 ```
 
@@ -98,7 +98,7 @@ annars vägrar Google inloggningen med `redirect_uri_mismatch`. Se
 Framför containern, en proxy som terminerar TLS. Caddy:
 
 ```
-medlemmar.rudbeckia.nu {
+members.rudbeckia.nu {
     reverse_proxy localhost:8082
 }
 ```

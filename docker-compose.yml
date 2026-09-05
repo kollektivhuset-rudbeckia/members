@@ -9,7 +9,7 @@ services:
       # --- Krävs -----------------------------------------------------------
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?sätt GOOGLE_CLIENT_ID i .env}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?sätt GOOGLE_CLIENT_SECRET i .env}
-      BASE_URL: ${BASE_URL:-https://medlemmar.rudbeckia.nu}
+      BASE_URL: ${BASE_URL:-https://members.rudbeckia.nu}
 
       # --- Synkroniseringen ------------------------------------------------
       # Utan tjänstekontot fungerar registret, men ingenting skrivs till
