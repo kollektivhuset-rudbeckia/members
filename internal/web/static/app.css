@@ -659,35 +659,90 @@ textarea:hover { border-color: var(--base-300); }
 .pay-facts.big dd strong { font-size: 1.1rem; font-family: var(--font-mono); }
 
 /* ---------- The candidate board ---------- */
-.board { display: grid; gap: 1.25rem; margin-bottom: 2rem; }
-@media (min-width: 62rem) {
-	.board { grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); align-items: start; }
+/* One row, always. A board where the finished columns hang below the live
+   ones is not a board; it scrolls sideways instead, like every other one. */
+.board {
+	display: flex; gap: 1rem; align-items: flex-start;
+	overflow-x: auto; padding-bottom: 1rem; margin-bottom: .75rem;
+	scrollbar-width: thin;
+	/* Let a lane's own scrollbar appear rather than growing the page. */
+	max-height: calc(100vh - 16rem); min-height: 20rem;
 }
-.board-column {
+.lane {
+	flex: 0 0 21rem; display: flex; flex-direction: column;
+	max-height: 100%;
 	background: var(--bg-soft); border: 1px solid var(--line);
-	border-radius: var(--radius-lg); padding: 1rem;
+	border-radius: var(--radius-lg); padding: .8rem;
 }
-.board-column.is-closed { opacity: .75; }
-.board-head { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; margin-bottom: .8rem; }
-.board-head h2 { margin: 0; font-size: 1rem; }
-.board-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; }
-.board-card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); }
-.board-card summary {
-	cursor: pointer; padding: .7rem .85rem; display: flex; flex-direction: column; gap: .25rem;
-	list-style: none;
+.lane.is-closed { background: transparent; border-style: dashed; }
+.lane.is-over { border-color: var(--accent); background: var(--accent-soft); }
+.lane-head { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; margin-bottom: .7rem; }
+.lane-head h2 { margin: 0; font-size: .95rem; }
+.lane-cards {
+	list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem;
+	overflow-y: auto; min-height: 3rem; align-content: start;
 }
-.board-card summary::-webkit-details-marker { display: none; }
-.board-card summary::before { content: "▸ "; color: var(--text-faint); }
-.board-card details[open] summary::before { content: "▾ "; }
-.board-card summary:hover { background: var(--bg-sunk); }
-.board-card summary strong { font-weight: 500; }
-.card-meta { display: flex; gap: .35rem; flex-wrap: wrap; }
-.card-body { padding: .3rem .85rem 1rem; border-top: 1px solid var(--line-soft); }
-.card-body .facts-list { margin: .8rem 0; font-size: .85rem; }
-.card-body .facts-list dt { flex-basis: 6.5rem; }
-.card-edit { margin-top: .8rem; padding-top: .8rem; border-top: 1px solid var(--line-soft); }
-.card-edit .field-grid { grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .6rem; }
-.card-edit .form-actions { margin-top: .8rem; }
-.card-welcome { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line-soft); }
-.board-empty { color: var(--text-faint); font-size: .85rem; margin: 0; padding: .5rem; }
+
+.card-c {
+	background: var(--bg); border: 1px solid var(--line);
+	border-radius: var(--radius); padding: .6rem .7rem; font-size: .85rem;
+	cursor: grab;
+}
+.card-c.is-dragging { opacity: .4; cursor: grabbing; }
+.card-c.is-saving { border-color: var(--accent); }
+.card-top { display: flex; align-items: baseline; gap: .35rem; flex-wrap: wrap; margin-bottom: .45rem; }
+.card-top strong { font-weight: 600; }
+.grip { color: var(--text-faint); cursor: grab; font-size: .9rem; }
+
+.card-fields { margin: 0; display: grid; gap: .15rem; }
+.card-fields > div { display: flex; gap: .5rem; align-items: baseline; }
+.card-fields dt {
+	flex: 0 0 5.5rem; color: var(--text-faint); font-size: .7rem;
+	text-transform: uppercase; letter-spacing: .03em;
+}
+.card-fields dd { margin: 0; min-width: 0; overflow-wrap: anywhere; flex: 1; }
+
+/* Anything you can click to change. Underlined faintly on hover so that it
+   reads as editable without shouting about it on every row. */
+[data-edit] {
+	cursor: text; border-radius: 3px; padding: 0 .15rem; margin: 0 -.15rem;
+	border-bottom: 1px dashed transparent;
+}
+[data-edit]:hover { background: var(--bg-sunk); border-bottom-color: var(--line); }
+[data-edit].is-saved { background: var(--ok-bg); }
+[data-edit].is-failed { background: var(--danger-bg); }
+.inline-input {
+	width: 100%; min-height: 0; font: inherit; font-size: .85rem;
+	padding: .1rem .25rem; border: 1px solid var(--accent); border-radius: 3px;
+	background: var(--bg); color: var(--text);
+}
+.card-said {
+	margin: .5rem 0 0; padding: .35rem .5rem; font-size: .8rem; font-style: italic;
+	color: var(--text-muted); background: var(--bg-sunk); border-radius: var(--radius-sm);
+}
+.card-foot {
+	display: flex; align-items: center; justify-content: space-between;
+	gap: .5rem; margin-top: .55rem; padding-top: .5rem;
+	border-top: 1px solid var(--line-soft); flex-wrap: wrap;
+}
+.move-form select { min-height: 0; padding: .15rem 1.6rem .15rem .35rem; font-size: .78rem; }
+.card-foot .link-button { font-size: .8rem; }
+.board-hint { margin-bottom: 2rem; }
+
+/* The add form, over the board rather than instead of it. */
+.sheet {
+	border: 1px solid var(--line); border-radius: var(--radius-lg);
+	background: var(--bg-soft); color: var(--text);
+	padding: 1.75rem; max-width: 40rem; width: calc(100% - 2rem);
+	box-shadow: var(--shadow);
+}
+.sheet::backdrop { background: rgb(16 15 15 / 45%); }
+.sheet h2 { margin-top: 0; }
+.sheet-close { display: flex; justify-content: flex-end; margin: -1rem -1rem 0 0; }
+.sheet-close button {
+	background: none; border: 0; font-size: 1.5rem; line-height: 1;
+	color: var(--text-faint); cursor: pointer; padding: .2rem .5rem;
+}
+.sheet-close button:hover { color: var(--text); }
+
 .proposal.is-settled { opacity: .65; }

@@ -129,6 +129,20 @@ func (h *harness) member(t *testing.T, id, email string, kind config.Kind) store
 	return m
 }
 
+// candidate puts somebody on the board and returns their id.
+func (h *harness) candidate(t *testing.T, name, email, stage string) string {
+	t.Helper()
+	id := "c-" + name
+	err := h.store.CreateCandidate(context.Background(), store.Candidate{
+		ID: id, Token: "tok-" + name, FirstName: name, Email: email,
+		Kind: config.KindVan, Stage: stage, CreatedAt: h.now, MovedAt: h.now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
 func TestEveryPageNeedsASignIn(t *testing.T) {
 	h := newHarness(t)
 	for _, page := range []string{"/", "/avgifter", "/andringar", "/synk", "/logg",
@@ -752,5 +766,100 @@ func TestTheSpreadsheetIsLinkedFromEveryPage(t *testing.T) {
 	}
 	if !strings.Contains(h.do(t, config.RoleCashier, "GET", "/avgifter", nil).Body.String(), "abc123") {
 		t.Error("the cashier cannot reach the spreadsheet from the fees page")
+	}
+}
+
+// The board edits one field at a time, over fetch, and the allowlist is what
+// stops a hand-made request from writing to a column nobody meant to expose.
+func TestOneFieldAtATimeOnTheBoard(t *testing.T) {
+	h := newHarness(t)
+	id := h.candidate(t, "Anna", "anna@example.test", "new")
+
+	ok := h.do(t, config.RoleIntake, "POST", "/kandidater/"+id+"/falt",
+		url.Values{"falt": {"telefon"}, "varde": {"070-1"}, "tyst": {"1"}})
+	if ok.Code != http.StatusNoContent {
+		t.Fatalf("saving a field: got %d, want 204", ok.Code)
+	}
+	c, err := h.store.Candidate(context.Background(), id, h.cfg.Location())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Phone != "070-1" {
+		t.Errorf("phone: got %q", c.Phone)
+	}
+
+	for _, tc := range []struct {
+		name  string
+		field string
+		value string
+	}{
+		{"a column that is not a field", "member_id", "someone-else"},
+		{"a column that is not a field", "token", "guessed"},
+		{"a stage that does not exist", "steg", "nonsense"},
+		{"a membership that does not exist", "typ", "nonsense"},
+		{"a date that is not one", "intervju", "on tuesday"},
+	} {
+		t.Run(tc.name+" "+tc.field, func(t *testing.T) {
+			rec := h.do(t, config.RoleIntake, "POST", "/kandidater/"+id+"/falt",
+				url.Values{"falt": {tc.field}, "varde": {tc.value}, "tyst": {"1"}})
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("got %d, want 400", rec.Code)
+			}
+		})
+	}
+
+	// Moving between stages is the same endpoint, which is what lets a drag
+	// and the selector on the card do exactly the same thing.
+	move := h.do(t, config.RoleIntake, "POST", "/kandidater/"+id+"/falt",
+		url.Values{"falt": {"steg"}, "varde": {"interview"}, "tyst": {"1"}})
+	if move.Code != http.StatusNoContent {
+		t.Fatalf("moving: got %d", move.Code)
+	}
+	c, _ = h.store.Candidate(context.Background(), id, h.cfg.Location())
+	if c.Stage != "interview" {
+		t.Errorf("stage: got %q, want interview", c.Stage)
+	}
+}
+
+// The pipeline is the interview team's. The cashier has no reason to read
+// what people said about themselves before the association agreed to
+// anything, and every reason not to have to.
+func TestTheCashierCannotReachTheBoard(t *testing.T) {
+	h := newHarness(t)
+	id := h.candidate(t, "Anna", "anna@example.test", "new")
+
+	for _, tc := range []struct {
+		method, path string
+		form         url.Values
+	}{
+		{"GET", "/kandidater", nil},
+		{"GET", "/kandidater/ny", nil},
+		{"POST", "/kandidater/ny", url.Values{"fornamn": {"X"}}},
+		{"POST", "/kandidater/" + id + "/falt", url.Values{"falt": {"telefon"}, "varde": {"x"}}},
+		{"POST", "/kandidater/" + id + "/valkomna", url.Values{}},
+	} {
+		rec := h.do(t, config.RoleCashier, tc.method, tc.path, tc.form)
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("%s %s: got %d, want 403", tc.method, tc.path, rec.Code)
+		}
+	}
+}
+
+// Every lane, in the order the configuration lists them, whether or not
+// anybody is standing in it. A board where the finished columns hang below
+// the live ones is not a board.
+func TestEveryStageGetsALane(t *testing.T) {
+	h := newHarness(t)
+	h.candidate(t, "Anna", "anna@example.test", "new")
+
+	body := h.do(t, config.RoleIntake, "GET", "/kandidater", nil).Body.String()
+	for _, stage := range h.cfg.Pipeline.Stages {
+		if !strings.Contains(body, `data-lane="`+stage.ID+`"`) {
+			t.Errorf("no lane for %q", stage.ID)
+		}
+	}
+	// And the add form is not sitting underneath them.
+	if strings.Contains(body, `action="/kandidater/ny"`) && !strings.Contains(body, "<dialog") {
+		t.Error("the add form is on the board rather than in a dialog")
 	}
 }

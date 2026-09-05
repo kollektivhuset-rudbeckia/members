@@ -42,7 +42,7 @@ membership:
   bankgiro: "5752-5925"
   # Föreningens Swish-nummer, med eller utan mellanslag. Lämna tomt så
   # erbjuds bara bankgiro på sidan där man går med.
-  swish: ""
+  swish: "123-133 37 07"
   payment_reference: "Medlemsavgift %s"
 
   # Sista dagen att betala, som MM-DD. Enligt medlemssidan betalas avgiften

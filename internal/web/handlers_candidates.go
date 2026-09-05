@@ -43,10 +43,6 @@ func (s *Server) handleCandidates(w http.ResponseWriter, r *http.Request, v *vie
 		return
 	}
 
-	// Fold the closed stages away unless asked for. They are history rather
-	// than work, and there are three times as many of them.
-	showClosed := r.URL.Query().Get("visa") == "alla"
-
 	byStage := map[string][]candidateView{}
 	for _, c := range list {
 		cv := candidateView{Candidate: c}
@@ -58,16 +54,14 @@ func (s *Server) handleCandidates(w http.ResponseWriter, r *http.Request, v *vie
 		byStage[c.Stage] = append(byStage[c.Stage], cv)
 	}
 
+	// Every stage gets a lane, in the order the configuration lists them, and
+	// they all sit in one row. A board where the finished columns hang below
+	// the live ones is not a board.
 	var columns []column
-	waiting, closed := 0, 0
+	waiting := 0
 	for _, st := range s.cfg.Pipeline.Stages {
 		people := byStage[st.ID]
-		if st.Closed {
-			closed += len(people)
-			if !showClosed {
-				continue
-			}
-		} else {
+		if !st.Closed {
 			waiting += len(people)
 		}
 		columns = append(columns, column{
@@ -86,16 +80,120 @@ func (s *Server) handleCandidates(w http.ResponseWriter, r *http.Request, v *vie
 
 	v.Title = i18n.T(v.Lang, "pipeline.title")
 	v.Data = map[string]any{
-		"Columns":    columns,
-		"Stages":     s.cfg.Pipeline.Stages,
-		"Waiting":    waiting,
-		"ClosedSeen": showClosed,
-		"ClosedN":    closed,
-		"Kinds":      s.kindOptions(v.Lang),
-		"JoinURL":    s.rt.BaseURL + "/bli-medlem",
-		"Form":       candidateForm{Kind: string(config.KindVan), Stage: s.cfg.Pipeline.EntryStage()},
+		"Columns": columns,
+		"Stages":  s.cfg.Pipeline.Stages,
+		"Waiting": waiting,
+		"Kinds":   s.kindOptions(v.Lang),
+		"JoinURL": s.rt.BaseURL + "/bli-medlem",
 	}
 	s.render(w, r, http.StatusOK, "pipeline.html", v)
+}
+
+// handleNewCandidateForm is the page behind the "add" button.
+//
+// It is a real page rather than only a dialog, so that the button is a link
+// that works before any JavaScript has run. With JavaScript the same markup
+// is shown in a dialog over the board, because leaving the board to write one
+// name down and coming back to find your scroll position gone is a small
+// misery repeated all afternoon.
+func (s *Server) handleNewCandidateForm(w http.ResponseWriter, r *http.Request, v *view) {
+	v.Title = i18n.T(v.Lang, "pipeline.add")
+	v.Data = map[string]any{
+		"Stages": s.cfg.Pipeline.Stages,
+		"Kinds":  s.kindOptions(v.Lang),
+		"Entry":  s.cfg.Pipeline.EntryStage(),
+	}
+	s.render(w, r, http.StatusOK, "candidate_new.html", v)
+}
+
+// editable are the fields a click on the board may change, and the only ones.
+// Anything else posted to the field endpoint is refused: an allowlist is what
+// stops a hand-made request from writing to a column nobody meant to expose.
+var editable = map[string]bool{
+	"fornamn": true, "efternamn": true, "epost": true, "telefon": true,
+	"lagenhet": true, "ansvarig": true, "intervju": true, "anteckning": true,
+	"typ": true, "steg": true,
+}
+
+// handleCandidateField changes one field of one candidate.
+//
+// One field, because that is what a click on the board edits. The whole form
+// still exists on the candidate's own page for anybody without JavaScript,
+// but nobody should have to open eleven inputs to correct a telephone number.
+func (s *Server) handleCandidateField(w http.ResponseWriter, r *http.Request, v *view) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	c, ok := s.candidate(w, r, v)
+	if !ok {
+		return
+	}
+	field := strings.TrimSpace(r.FormValue("falt"))
+	value := strings.TrimSpace(r.FormValue("varde"))
+	if !editable[field] {
+		http.Error(w, "no such field", http.StatusBadRequest)
+		return
+	}
+	if len([]rune(value)) > 500 {
+		http.Error(w, "too long", http.StatusRequestEntityTooLarge)
+		return
+	}
+
+	switch field {
+	case "fornamn":
+		c.FirstName = value
+	case "efternamn":
+		c.LastName = value
+	case "epost":
+		c.Email = store.Email(value)
+	case "telefon":
+		c.Phone = value
+	case "lagenhet":
+		c.Apartment = value
+	case "ansvarig":
+		c.Responsible = value
+	case "anteckning":
+		c.Note = value
+	case "typ":
+		kind, ok := config.ParseKind(value)
+		if !ok {
+			http.Error(w, "no such membership", http.StatusBadRequest)
+			return
+		}
+		c.Kind = kind
+	case "steg":
+		if _, known := s.cfg.Pipeline.Stage(value); !known {
+			http.Error(w, "no such stage", http.StatusBadRequest)
+			return
+		}
+		c.Stage = value
+	case "intervju":
+		c.InterviewOn = sql.NullTime{}
+		if value != "" {
+			t, err := store.ParseDay(value, v.Loc)
+			if err != nil {
+				http.Error(w, "not a date", http.StatusBadRequest)
+				return
+			}
+			c.InterviewOn = sql.NullTime{Time: t, Valid: true}
+		}
+	}
+	c.MovedAt, c.MovedBy = s.now(), v.Session.Email
+
+	if err := s.store.UpdateCandidate(r.Context(), c); err != nil {
+		s.log.Error("could not change a candidate", "err", err)
+		http.Error(w, "could not save", http.StatusInternalServerError)
+		return
+	}
+
+	// A form post without JavaScript wants a page back; the board's own
+	// requests only want to know it worked.
+	if r.Header.Get("Accept") == "application/json" || r.FormValue("tyst") == "1" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	http.Redirect(w, r, s.backTo(r, "/kandidater"), http.StatusSeeOther)
 }
 
 // candidateForm is the add-and-edit form for somebody the team met rather

@@ -143,3 +143,54 @@
 </nav>
 {{end}}
 {{end}}
+
+{{/* The add form, shared by the page at /kandidater/ny and the dialog the
+     board opens over itself. One definition, so the two cannot drift. */}}
+{{define "candidatefields"}}
+<form method="post" action="/kandidater/ny">
+	<div class="field-grid">
+		<div class="field">
+			<label for="ny-fornamn">{{t "form.firstname"}}</label>
+			<input id="ny-fornamn" name="fornamn" type="text" required autocomplete="given-name">
+		</div>
+		<div class="field">
+			<label for="ny-efternamn">{{t "form.lastname"}}</label>
+			<input id="ny-efternamn" name="efternamn" type="text" autocomplete="family-name">
+		</div>
+		<div class="field">
+			<label for="ny-epost">{{t "form.email"}}</label>
+			<input id="ny-epost" name="epost" type="email" autocomplete="email" spellcheck="false">
+		</div>
+		<div class="field">
+			<label for="ny-telefon">{{t "form.phone"}}</label>
+			<input id="ny-telefon" name="telefon" type="tel" autocomplete="tel">
+		</div>
+		<div class="field">
+			<label for="ny-lagenhet">{{t "pipeline.apartment"}}</label>
+			<input id="ny-lagenhet" name="lagenhet" type="text">
+		</div>
+		<div class="field">
+			<label for="ny-ansvarig">{{t "pipeline.responsible"}}</label>
+			<input id="ny-ansvarig" name="ansvarig" type="text">
+		</div>
+		<div class="field">
+			<label for="ny-intervju">{{t "pipeline.interview"}}</label>
+			<input id="ny-intervju" name="intervju" type="date">
+		</div>
+		<div class="field">
+			<label for="ny-steg">{{t "pipeline.stage"}}</label>
+			<select id="ny-steg" name="steg">
+				{{range .Stages}}<option value="{{.ID}}" {{if eq .ID $.Entry}}selected{{end}}>{{.NameFor (printf "%s" $.Lang)}}</option>{{end}}
+			</select>
+		</div>
+		<div class="field field-wide">
+			<label for="ny-anteckning">{{t "form.note"}}</label>
+			<input id="ny-anteckning" name="anteckning" type="text" maxlength="500">
+		</div>
+	</div>
+	<div class="form-actions">
+		<button type="submit" class="button primary">{{t "pipeline.add"}}</button>
+		<a class="button ghost" href="/kandidater">{{t "cancel"}}</a>
+	</div>
+</form>
+{{end}}
