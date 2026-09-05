@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -644,5 +645,112 @@ func TestOnlyTheBoardCanStartASync(t *testing.T) {
 		if rec.Code != http.StatusForbidden {
 			t.Errorf("%s: got %d, want 403", role, rec.Code)
 		}
+	}
+}
+
+// A register of a few hundred is a long table. It pages — and the paging must
+// not quietly change what a filter means.
+func TestTheRegisterPages(t *testing.T) {
+	h := newHarness(t)
+	for i := 0; i < 60; i++ {
+		h.member(t, fmt.Sprintf("m%02d", i), fmt.Sprintf("m%02d@example.test", i), config.KindBo)
+	}
+
+	first := h.do(t, config.RoleBoard, "GET", "/", nil)
+	if first.Code != http.StatusOK {
+		t.Fatalf("got %d", first.Code)
+	}
+	body := first.Body.String()
+	if !strings.Contains(body, "Visar 1–50 av 60") {
+		t.Error("the pager does not say which rows are on screen")
+	}
+	if strings.Contains(body, "m59@example.test") {
+		t.Error("row 60 is on the first page of 50")
+	}
+
+	second := h.do(t, config.RoleBoard, "GET", "/?sida=2", nil).Body.String()
+	if !strings.Contains(second, "m59@example.test") {
+		t.Error("row 60 is not on the second page either")
+	}
+	if strings.Contains(second, "m00@example.test") {
+		t.Error("the second page still holds the first page's rows")
+	}
+
+	// Asking for a page past the end lands on the last one rather than on
+	// nothing at all.
+	beyond := h.do(t, config.RoleBoard, "GET", "/?sida=99", nil).Body.String()
+	if !strings.Contains(beyond, "m59@example.test") {
+		t.Error("a page past the end should show the last page")
+	}
+
+	// And everything on one page when asked.
+	all := h.do(t, config.RoleBoard, "GET", "/?antal=0", nil).Body.String()
+	if !strings.Contains(all, "m00@example.test") || !strings.Contains(all, "m59@example.test") {
+		t.Error("antal=0 did not put the whole register on one page")
+	}
+}
+
+// The search box filters in the browser, which is fast and right — but only
+// while the browser can see every row. Filtering the visible page and quietly
+// hiding the rest would be worse than not filtering at all.
+func TestTheBrowserOnlyFiltersWhenItCanSeeEverything(t *testing.T) {
+	h := newHarness(t)
+	for i := 0; i < 60; i++ {
+		h.member(t, fmt.Sprintf("m%02d", i), fmt.Sprintf("m%02d@example.test", i), config.KindBo)
+	}
+
+	paged := h.do(t, config.RoleBoard, "GET", "/", nil).Body.String()
+	if strings.Contains(paged, "data-table-filter") {
+		t.Error("the browser would filter only the visible page")
+	}
+	if !strings.Contains(paged, "hela registret") {
+		t.Error("nothing tells the reader that the search covers everything")
+	}
+
+	whole := h.do(t, config.RoleBoard, "GET", "/?antal=0", nil).Body.String()
+	if !strings.Contains(whole, "data-table-filter") {
+		t.Error("with every row on the page the browser should filter")
+	}
+}
+
+// Changing a filter or the sort has to start again at the first page: page 3
+// of the old view is meaningless in the new one.
+func TestFilteringAndSortingReturnToTheFirstPage(t *testing.T) {
+	q := tableQuery{Sort: "name", Page: 3, PerPage: 50}
+	if link := q.SortLink("/", "email"); strings.Contains(link, "sida") {
+		t.Errorf("a sort kept the page number: %s", link)
+	}
+	if link := q.PerPageLink("/", 100); strings.Contains(link, "sida") {
+		t.Errorf("changing the page size kept the page number: %s", link)
+	}
+	// But a page link keeps the filter and the sort. The default sort is
+	// deliberately left out of the address, so use another one.
+	q.Filter.Kind = config.KindVan
+	q.Sort = "tenure"
+	link := q.PageLink("/", 2)
+	for _, want := range []string{"typ=van", "ordna=tenure", "sida=2"} {
+		if !strings.Contains(link, want) {
+			t.Errorf("the page link lost %q: %s", want, link)
+		}
+	}
+}
+
+// The spreadsheet is the one thing here that lives somewhere else.
+func TestTheSpreadsheetIsLinkedFromEveryPage(t *testing.T) {
+	h := newHarness(t)
+	if h.server.sheetURL() != "" {
+		t.Fatal("the test configuration should have no spreadsheet")
+	}
+	if strings.Contains(h.do(t, config.RoleBoard, "GET", "/", nil).Body.String(), "docs.google.com") {
+		t.Error("a link appeared with no spreadsheet configured")
+	}
+
+	h.cfg.Sheet.ID = "abc123"
+	page := h.do(t, config.RoleBoard, "GET", "/", nil).Body.String()
+	if !strings.Contains(page, "https://docs.google.com/spreadsheets/d/abc123/edit") {
+		t.Error("the spreadsheet is not linked from the register")
+	}
+	if !strings.Contains(h.do(t, config.RoleCashier, "GET", "/avgifter", nil).Body.String(), "abc123") {
+		t.Error("the cashier cannot reach the spreadsheet from the fees page")
 	}
 }

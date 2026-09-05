@@ -39,6 +39,7 @@ func (s *Server) handlePayments(w http.ResponseWriter, r *http.Request, v *view)
 		membership.Sort(rows, q.Sort, q.Desc)
 	}
 
+	pages := paginate(rows, q.Page, q.PerPage)
 	counts := roster.Count()
 	var received int
 	for _, s := range roster.All {
@@ -49,7 +50,8 @@ func (s *Server) handlePayments(w http.ResponseWriter, r *http.Request, v *view)
 
 	v.Title = i18n.T(v.Lang, "fees.title")
 	v.Data = map[string]any{
-		"Rows":      rows,
+		"Rows":      pages.Rows,
+		"Pages":     pages,
 		"Counts":    counts,
 		"Query":     q,
 		"Year":      year,

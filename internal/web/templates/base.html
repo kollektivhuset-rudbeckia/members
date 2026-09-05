@@ -59,6 +59,9 @@
 				{{if .Alarm.Bad}}<span class="tag tag-bad" title="{{t "nav.sync.trouble" .Alarm.Loud}}">{{.Alarm.Loud}}</span>{{end}}
 			</a>
 			{{if .May "approve"}}<a href="/logg" {{if hasPrefix .Path "/logg"}}aria-current="page"{{end}}>{{t "nav.log"}}</a>{{end}}
+			{{/* The one thing here that lives somewhere else. Hunting for the
+			     tab in Drive is a small tax paid over and over. */}}
+			{{with .SheetURL}}<a href="{{.}}" target="_blank" rel="noopener" class="external">{{t "nav.sheet"}}<span aria-hidden="true"> ↗</span></a>{{end}}
 		</nav>
 		{{end}}
 		<div class="topbar-actions">

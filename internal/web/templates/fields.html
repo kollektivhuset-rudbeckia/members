@@ -103,3 +103,43 @@
 	</div>
 </div>
 {{end}}
+
+{{/* The pager. Plain links, so a page is an address somebody can send on, and
+     so it works with JavaScript switched off. */}}
+{{define "pager"}}
+{{- $q := .Q}}{{$p := .Pages}}{{$base := .Base -}}
+{{if or (gt $p.Count 1) (gt $p.Total 25)}}
+<nav class="pager" aria-label="{{t "pager.label"}}">
+	<p class="pager-count">
+		{{if gt $p.Total 0}}{{t "pager.showing" $p.First $p.Last $p.Total}}{{end}}
+	</p>
+
+	{{if gt $p.Count 1}}
+	<ul class="pager-pages">
+		<li>
+			{{if $p.HasPrev}}<a href="{{$q.PageLink $base $p.Prev}}" rel="prev">{{t "pager.prev"}}</a>
+			{{else}}<span class="is-off">{{t "pager.prev"}}</span>{{end}}
+		</li>
+		{{range $p.Numbers}}
+		<li>
+			{{if eq . $p.Page}}<span class="is-here" aria-current="page">{{.}}</span>
+			{{else}}<a href="{{$q.PageLink $base .}}">{{.}}</a>{{end}}
+		</li>
+		{{end}}
+		<li>
+			{{if $p.HasNext}}<a href="{{$q.PageLink $base $p.Next}}" rel="next">{{t "pager.next"}}</a>
+			{{else}}<span class="is-off">{{t "pager.next"}}</span>{{end}}
+		</li>
+	</ul>
+	{{end}}
+
+	<p class="pager-size">
+		{{t "pager.perpage"}}
+		{{range $q.PerPageChoices}}
+		{{if eq . $p.PerPage}}<span class="is-here">{{if . }}{{.}}{{else}}{{t "all"}}{{end}}</span>
+		{{else}}<a href="{{$q.PerPageLink $base .}}">{{if .}}{{.}}{{else}}{{t "all"}}{{end}}</a>{{end}}
+		{{end}}
+	</p>
+</nav>
+{{end}}
+{{end}}

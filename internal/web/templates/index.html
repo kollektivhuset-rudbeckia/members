@@ -48,9 +48,15 @@
 	<form method="get" action="/" class="filter-form">
 		<div class="field grow">
 			<label for="sok">{{t "filter.search"}}</label>
+			{{/* The box only filters in the browser when the whole register is
+			     on the page. Filtering the visible rows while quietly hiding
+			     the rest would be worse than not filtering at all, so when
+			     there is more than one page it submits and the server
+			     searches the lot. */}}
 			<input id="sok" name="sok" type="search" value="{{$f.Query}}"
 			       placeholder="{{t "filter.search.hint"}}" autocomplete="off"
-			       data-table-filter="#roster">
+			       {{if .Data.Pages.Complete}}data-table-filter="#roster"{{end}}>
+			{{if not .Data.Pages.Complete}}<small class="hint">{{t "filter.search.whole"}}</small>{{end}}
 		</div>
 		<div class="field">
 			<label for="typ">{{t "filter.kind"}}</label>
@@ -80,6 +86,7 @@
 		</div>
 		{{if $q.Sort}}<input type="hidden" name="ordna" value="{{$q.Sort}}">{{end}}
 		{{if $q.Desc}}<input type="hidden" name="fallande" value="1">{{end}}
+		{{if ne $q.PerPage 50}}<input type="hidden" name="antal" value="{{$q.PerPage}}">{{end}}
 		<div class="filter-actions">
 			<button type="submit" class="button">{{t "filter.apply"}}</button>
 			{{if not $f.Empty}}<a class="button ghost" href="/">{{t "filter.clear"}}</a>{{end}}
@@ -91,8 +98,8 @@
 <section class="panel">
 	<div class="panel-head">
 		<h2>
-			{{count "member" (len .Data.Rows)}}
-			{{if ne (len .Data.Rows) .Data.Total}}<small class="muted">{{t "register.of" .Data.Total}}</small>{{end}}
+			{{count "member" .Data.Pages.Total}}
+			{{if ne .Data.Pages.Total .Data.Total}}<small class="muted">{{t "register.of" .Data.Total}}</small>{{end}}
 		</h2>
 		<p class="muted small" data-filter-count hidden></p>
 	</div>
@@ -135,6 +142,7 @@
 		</table>
 	</div>
 	<p class="empty" data-filter-empty hidden>{{t "register.nomatch"}}</p>
+	{{template "pager" dict "Q" $q "Pages" .Data.Pages "Base" "/"}}
 	{{else}}
 	<p class="empty">{{t "register.nomatch"}}</p>
 	{{end}}

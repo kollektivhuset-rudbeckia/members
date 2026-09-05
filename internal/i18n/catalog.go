@@ -58,6 +58,7 @@ var catalog = map[string]entry{
 	"nav.sync":              {"Synk", "Sync"},
 	"nav.sync.trouble":      {"%d saker är inte synkroniserade", "%d things are not synchronised"},
 	"nav.log":               {"Logg", "Log"},
+	"nav.sheet":             {"Kalkylark", "Spreadsheet"},
 
 	// --- the roles -----------------------------------------------------------
 	"role.intake":      {"Ny", "Intake"},
@@ -104,6 +105,12 @@ var catalog = map[string]entry{
 	"register.empty.import": {"Hämta det som redan står i Google Kontakter hos styrelsen:", "Take what is already in the board's Google Contacts:"},
 	"register.empty.byhand": {"Eller skriv in den första medlemmen för hand:", "Or write down the first member by hand:"},
 
+	"pager.label":   {"Sidor", "Pages"},
+	"pager.showing": {"Visar %d–%d av %d", "Showing %d–%d of %d"},
+	"pager.prev":    {"Föregående", "Previous"},
+	"pager.next":    {"Nästa", "Next"},
+	"pager.perpage": {"Per sida:", "Per page:"},
+
 	"stat.paid":    {"betalt %d", "paid %d"},
 	"stat.overdue": {"förfallna", "overdue"},
 	"stat.former":  {"tidigare medlemmar", "former members"},
@@ -117,6 +124,7 @@ var catalog = map[string]entry{
 	"filter.title":        {"Filtrera", "Filter"},
 	"filter.search":       {"Sök", "Search"},
 	"filter.search.hint":  {"namn, e-post, telefon, lägenhet", "name, e-mail, telephone, apartment"},
+	"filter.search.whole": {"Söker i hela registret, inte bara den här sidan.", "Searches the whole register, not just this page."},
 	"filter.kind":         {"Medlemstyp", "Membership"},
 	"filter.fee":          {"Avgift %d", "Fee %d"},
 	"filter.show":         {"Visa", "Show"},

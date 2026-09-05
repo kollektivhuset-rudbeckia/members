@@ -19,7 +19,19 @@ type tableQuery struct {
 	Filter membership.Filter
 	Sort   string
 	Desc   bool
+	// Page is 1-based. PerPage of 0 means everything on one page.
+	Page    int
+	PerPage int
 }
+
+// perPageChoices are the page sizes on offer. 0 is "all", which stays
+// available because a register of a few hundred is small enough to want whole
+// sometimes — to print it, or to search the lot with the browser's own find.
+var perPageChoices = []int{25, 50, 100, 0}
+
+// defaultPerPage keeps the first screen short without hiding most of a small
+// association behind a pager.
+const defaultPerPage = 50
 
 func readTableQuery(r *http.Request) tableQuery {
 	q := r.URL.Query()
@@ -28,6 +40,16 @@ func readTableQuery(r *http.Request) tableQuery {
 	if show != "former" && show != "all" {
 		show = "current"
 	}
+	perPage := defaultPerPage
+	if raw := q.Get("antal"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && validPerPage(n) {
+			perPage = n
+		}
+	}
+	page := 1
+	if n, err := strconv.Atoi(q.Get("sida")); err == nil && n > 1 {
+		page = n
+	}
 	return tableQuery{
 		Filter: membership.Filter{
 			Kind:  kind,
@@ -35,9 +57,83 @@ func readTableQuery(r *http.Request) tableQuery {
 			Show:  show,
 			Query: strings.TrimSpace(q.Get("sok")),
 		},
-		Sort: membership.ValidSort(q.Get("ordna")),
-		Desc: q.Get("fallande") == "1",
+		Sort:    membership.ValidSort(q.Get("ordna")),
+		Desc:    q.Get("fallande") == "1",
+		Page:    page,
+		PerPage: perPage,
 	}
+}
+
+func validPerPage(n int) bool {
+	for _, c := range perPageChoices {
+		if c == n {
+			return true
+		}
+	}
+	return false
+}
+
+// Pages is one screenful of a sorted register, plus everything a pager needs
+// to describe itself.
+type Pages struct {
+	Rows []membership.Status
+	// Page is the one being shown, Count how many there are.
+	Page    int
+	Count   int
+	PerPage int
+	// First and Last are the 1-based positions of the rows on this page, for
+	// "51–100 av 114".
+	First, Last int
+	Total       int
+	// Complete reports whether every matching row is on this page. It is what
+	// decides whether the search box may filter in the browser: filtering
+	// only the visible page while quietly hiding the rest would be worse than
+	// not filtering at all.
+	Complete bool
+	Numbers  []int
+}
+
+// HasPrev and HasNext keep the arithmetic out of the template.
+func (p Pages) HasPrev() bool { return p.Page > 1 }
+func (p Pages) HasNext() bool { return p.Page < p.Count }
+func (p Pages) Prev() int     { return p.Page - 1 }
+func (p Pages) Next() int     { return p.Page + 1 }
+
+// paginate cuts the sorted rows down to the page asked for.
+func paginate(rows []membership.Status, page, perPage int) Pages {
+	total := len(rows)
+	if perPage <= 0 || total == 0 {
+		return Pages{Rows: rows, Page: 1, Count: 1, PerPage: 0,
+			First: min(1, total), Last: total, Total: total, Complete: true}
+	}
+	count := (total + perPage - 1) / perPage
+	if page > count {
+		page = count
+	}
+	if page < 1 {
+		page = 1
+	}
+	start := (page - 1) * perPage
+	end := start + perPage
+	if end > total {
+		end = total
+	}
+	numbers := make([]int, 0, count)
+	for i := 1; i <= count; i++ {
+		numbers = append(numbers, i)
+	}
+	return Pages{
+		Rows: rows[start:end], Page: page, Count: count, PerPage: perPage,
+		First: start + 1, Last: end, Total: total,
+		Complete: count == 1, Numbers: numbers,
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func readFeeState(s string) membership.FeeState {
@@ -76,13 +172,48 @@ func (t tableQuery) Values() url.Values {
 	if t.Desc {
 		v.Set("fallande", "1")
 	}
+	if t.PerPage != defaultPerPage {
+		v.Set("antal", strconv.Itoa(t.PerPage))
+	}
 	return v
 }
+
+// PageLink is one page of the current view. The page number is the only thing
+// that changes; every filter and the sort come along.
+func (t tableQuery) PageLink(base string, page int) string {
+	v := t.Values()
+	if page > 1 {
+		v.Set("sida", strconv.Itoa(page))
+	}
+	if len(v) == 0 {
+		return base
+	}
+	return base + "?" + v.Encode()
+}
+
+// PerPageLink switches the page size and returns to the first page, because
+// "page 3 of 5" means something different once the pages are twice the size.
+func (t tableQuery) PerPageLink(base string, n int) string {
+	v := t.Values()
+	v.Del("antal")
+	v.Del("sida")
+	if n != defaultPerPage {
+		v.Set("antal", strconv.Itoa(n))
+	}
+	if len(v) == 0 {
+		return base
+	}
+	return base + "?" + v.Encode()
+}
+
+// PerPageChoices is the sizes on offer, for the template.
+func (t tableQuery) PerPageChoices() []int { return perPageChoices }
 
 // SortLink is the address a column heading points at: the same view ordered
 // by that column, flipping the direction if it is already the one in use.
 func (t tableQuery) SortLink(base, key string) string {
 	v := t.Values()
+	v.Del("sida")
 	v.Set("ordna", key)
 	if t.Sort == key && !t.Desc {
 		v.Set("fallande", "1")
@@ -117,13 +248,16 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request, v *view)
 	q := readTableQuery(r)
 	rows := roster.Apply(q.Filter)
 	membership.Sort(rows, q.Sort, q.Desc)
+	pages := paginate(rows, q.Page, q.PerPage)
 
 	v.Title = i18n.T(v.Lang, "register.title")
 	v.Data = map[string]any{
-		"Rows":      rows,
+		"Rows":      pages.Rows,
+		"Pages":     pages,
 		"Counts":    roster.Count(),
 		"Query":     q,
 		"Total":     len(roster.All),
+		"SheetURL":  s.sheetURL(),
 		"ExportURL": exportURL(r),
 		"Kinds":     s.kindOptions(v.Lang),
 		"Empty":     len(roster.All) == 0,

@@ -58,7 +58,8 @@
 			<label for="sok">{{t "filter.search"}}</label>
 			<input id="sok" name="sok" type="search" value="{{$f.Query}}"
 			       placeholder="{{t "filter.search.hint"}}" autocomplete="off"
-			       data-table-filter="#fees">
+			       {{if .Data.Pages.Complete}}data-table-filter="#fees"{{end}}>
+			{{if not .Data.Pages.Complete}}<small class="hint">{{t "filter.search.whole"}}</small>{{end}}
 		</div>
 		<div class="field">
 			<label for="typ">{{t "filter.kind"}}</label>
@@ -86,7 +87,7 @@
 
 <section class="panel">
 	<div class="panel-head">
-		<h2>{{count "member" (len .Data.Rows)}}</h2>
+		<h2>{{count "member" .Data.Pages.Total}}</h2>
 		{{if .May "pay"}}<p class="muted small">{{t "fees.tick"}}</p>{{end}}
 	</div>
 	{{if .Data.Rows}}
@@ -137,6 +138,7 @@
 		</table>
 	</div>
 	<p class="empty" data-filter-empty hidden>{{t "register.nomatch"}}</p>
+	{{template "pager" dict "Q" $q "Pages" .Data.Pages "Base" "/avgifter"}}
 	{{else}}
 	<p class="empty">{{t "register.nomatch"}}</p>
 	{{end}}

@@ -225,6 +225,9 @@ type view struct {
 	// Overdue is how many members owe this year's fee past their due date.
 	Overdue int
 
+	// SheetURL is the cashiers' spreadsheet, for the link in the top bar.
+	SheetURL string
+
 	Flash     string
 	FlashKind string
 	Data      any
@@ -278,6 +281,7 @@ func (s *Server) newView(r *http.Request, w http.ResponseWriter, session auth.Se
 		Loc:       s.cfg.Location(),
 		Path:      r.URL.Path,
 		Demo:      s.rt.Demo,
+		SheetURL:  s.sheetURL(),
 		Flash:     flash,
 		FlashKind: kind,
 		access:    s.rt.Access,
@@ -345,6 +349,16 @@ func (s *Server) roster(ctx context.Context) (membership.Roster, error) {
 		return membership.Roster{}, fmt.Errorf("read the payments: %w", err)
 	}
 	return membership.Build(members, payments, s.cfg, s.now()), nil
+}
+
+// sheetURL is the cashiers' spreadsheet, or empty when there is none. It is
+// on every page: it is the one thing here that lives somewhere else, and
+// hunting for the tab in Drive is a small tax paid over and over.
+func (s *Server) sheetURL() string {
+	if !s.cfg.Sheet.Enabled() {
+		return ""
+	}
+	return "https://docs.google.com/spreadsheets/d/" + s.cfg.Sheet.ID + "/edit"
 }
 
 // defaultLang is the language a visitor gets before choosing one.
