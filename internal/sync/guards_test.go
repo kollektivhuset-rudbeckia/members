@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kollektivhuset-rudbeckia/members/internal/config"
+	"github.com/kollektivhuset-rudbeckia/members/internal/google"
 	"github.com/kollektivhuset-rudbeckia/members/internal/store"
 )
 
@@ -155,5 +156,37 @@ func TestAnExtraGroupMembershipReachesTheGroupButNotTheAddressBook(t *testing.T)
 		map[string]store.Member{"nora@example.test": resident})
 	if run.Added != 0 {
 		t.Errorf("a contact card was created under a label that is not the member's kind")
+	}
+}
+
+// A stray is by definition somebody the register has never heard of, so its
+// address is all the page would otherwise have to show — and an address alone
+// is not enough to decide whether a card should go. This was found the hard
+// way: sberg@example.com on the sync page was mistaken for ssberg@example.com,
+// a current member, because neither had a name beside it.
+func TestAStrayContactIsNamed(t *testing.T) {
+	tests := []struct {
+		name string
+		card google.Person
+		want string
+	}{
+		{"an ordinary card", google.Person{
+			Names:  []google.Name{{DisplayName: "Eva Almqvist"}},
+			Emails: []google.Email{{Value: "almqvist.eva@example.com"}},
+		}, "Eva Almqvist"},
+		{"a card with only a number", google.Person{
+			Emails: []google.Email{{Value: "x@example.test"}},
+			Phones: []google.Phone{{Value: "070-1"}},
+		}, "a card with no name (070-1)"},
+		{"a card with nothing", google.Person{
+			Emails: []google.Email{{Value: "x@example.test"}},
+		}, "a card with no name"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := whoIs(tc.card); got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
 	}
 }

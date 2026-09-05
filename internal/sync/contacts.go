@@ -197,17 +197,25 @@ func (s *Syncer) reconcileLabel(ctx context.Context, target, mailbox string, kin
 			continue
 		}
 
+		// Whoever the card says they are. A stray is by definition somebody
+		// the register has never heard of, so its address is all the page
+		// would otherwise have to show — and an address alone is not enough
+		// for the board to decide whether a card should go. Google knows the
+		// name; carry it across.
+		who := whoIs(card)
+
 		if held {
 			run.OK, run.Failed = false, run.Failed+1
 			s.recordAddress(ctx, target, email, "", store.Absent, false,
-				fmt.Sprintf("would be deleted, but %d contacts at once is more than "+
-					"max_removals_per_run (%d) — nothing was deleted", doomed, brake))
+				fmt.Sprintf("%s has the registry's label but is not in the register. "+
+					"Would be deleted, but %d cards at once is more than "+
+					"max_removals_per_run (%d), so nothing was deleted.", who, doomed, brake))
 			continue
 		}
 		if !s.cfg.Contacts.Pruning() {
 			run.OK, run.Failed = false, run.Failed+1
 			s.recordAddress(ctx, target, email, "", store.Absent, false,
-				"has the registry's label but is not in the register, and pruning is off")
+				who+" has the registry's label but is not in the register, and pruning is off")
 			continue
 		}
 		if err := s.gc.DeleteContact(ctx, mailbox, card.ResourceName); err != nil {
@@ -216,9 +224,22 @@ func (s *Syncer) reconcileLabel(ctx context.Context, target, mailbox string, kin
 			continue
 		}
 		run.Removed++
-		s.log.Info("removed a stray contact", "mailbox", mailbox, "address", email)
+		s.log.Info("removed a stray contact", "mailbox", mailbox, "address", email, "name", who)
 	}
 	return touched
+}
+
+// whoIs names a contact card for a person reading the sync page. A card with
+// no name at all falls back to saying so rather than to an empty string,
+// which would read as a missing word rather than a missing name.
+func whoIs(p google.Person) string {
+	if name := strings.TrimSpace(p.DisplayName()); name != "" {
+		return name
+	}
+	if phone := strings.TrimSpace(p.PrimaryPhone()); phone != "" {
+		return "a card with no name (" + phone + ")"
+	}
+	return "a card with no name"
 }
 
 // card is the contact the registry wants to see for a member.
