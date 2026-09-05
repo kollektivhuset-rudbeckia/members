@@ -103,6 +103,10 @@ contacts:
   labels:
     bo: Bomedlemmar
     van: Vänmedlemmar
+  # Ta av registrets etikett från kort som inte hör dit längre. Kortet ligger
+  # kvar — registret raderar aldrig ett kontaktkort, oavsett vad som händer
+  # med medlemmen. Ett kort bär ett namn och ett telefonnummer som kanske inte
+  # finns någon annanstans, och brevlådorna används till mer än registret.
   prune: true
 
 # --------------------------------------------------------------------------
@@ -129,8 +133,12 @@ sync:
   # Hur länge en adress får misslyckas innan den röda bannern går på. Något
   # som rättar sig själv vid nästa körning var aldrig värt ett larm.
   alert_after_minutes: 30
-  # Nödbroms. En körning som vill ta bort fler än så här många adresser ur en
-  # grupp eller en etikett gör ingenting alls, och rapporterar i stället.
+  # Nödbroms för grupperna. En körning som vill ta bort fler än så här många
+  # adresser ur en Google-grupp gör ingenting alls, och rapporterar i stället.
+  #
+  # Gäller bara grupperna. Adressböckerna har ingenting att bromsa: registret
+  # raderar aldrig ett kontaktkort, utan tar bara av sin egen etikett, och det
+  # går att göra om.
   #
   # Föreningen tappar några medlemmar om året. En körning som vill ta bort ett
   # dussin är inte en händelserik vecka utan ett misstag — ett tomt register,

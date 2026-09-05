@@ -297,18 +297,18 @@ func (c *Client) UpdateContact(ctx context.Context, mailbox string, p Person) er
 	return nil
 }
 
-// DeleteContact removes a card outright.
-func (c *Client) DeleteContact(ctx context.Context, mailbox, resourceName string) error {
-	endpoint := fmt.Sprintf("%s/%s:deleteContact", peopleBase, resourceName)
-	err := c.call(ctx, mailbox, ContactsScopes, "DELETE", endpoint, nil, nil)
-	if NotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("remove a contact from %s: %w", mailbox, err)
-	}
-	return nil
-}
+// There is deliberately no DeleteContact.
+//
+// The registry never deletes a card in anybody's address book — not for a
+// stray, not for a member who has left, not ever. A contact card carries a
+// name and a telephone number that may exist nowhere else, and the register
+// is not the only thing that uses these mailboxes. When somebody no longer
+// belongs under a label, the label comes off with ModifyLabel and the card
+// stays where its owner put it.
+//
+// This is a missing method rather than a rule written down somewhere,
+// because a rule can be forgotten by the next change and a missing method
+// cannot be called by one.
 
 // ModifyLabel adds and removes contacts from a label without touching the
 // cards themselves. It is how somebody who moves from vänmedlem to bomedlem

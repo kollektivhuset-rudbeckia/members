@@ -159,72 +159,47 @@ func (s *Syncer) reconcileLabel(ctx context.Context, target, mailbox string, kin
 	}
 	strays = append(strays, duplicates...)
 
-	// The same brake as the groups. Deleting a card throws away a name and a
-	// telephone number that may exist nowhere else, so the threshold counts
-	// only the cards that would actually be deleted — somebody who has merely
-	// moved between the two labels keeps their card and does not count.
-	doomed := 0
-	for _, card := range strays {
-		if m, ok := byKey[s.cfg.Sync.MatchKey(card.PrimaryEmail())]; ok && m.Current() && m.Kind != kind {
-			continue
-		}
-		doomed++
-	}
-	brake := s.cfg.Sync.MaxRemovalsPerRun
-	held := brake > 0 && doomed > brake
-	if held {
-		s.log.Warn("refusing a bulk contact deletion", "mailbox", mailbox,
-			"label", label.Name, "would_delete", doomed, "limit", brake)
-	}
+	// No brake here, and nothing to brake. Everything below takes a label off
+	// a card; nothing deletes one. Unlabelling loses nothing and the next run
+	// puts it back if the register says so, so a limit would only ever leave
+	// labels wrong until somebody went and raised it.
 
 	for _, card := range strays {
 		email := card.PrimaryEmail()
 		touched = append(touched, email)
-
-		// Somebody who moved between bomedlem and vänmedlem is not a stray:
-		// they belong under the other label, and the pass for that label will
-		// have picked them up. Take the label off and leave the card alone,
-		// so their notes and history survive the move.
-		if m, ok := byKey[s.cfg.Sync.MatchKey(email)]; ok && m.Current() && m.Kind != kind {
-			if err := s.gc.ModifyLabel(ctx, mailbox, label.ResourceName, nil,
-				[]string{card.ResourceName}); err != nil {
-				run.OK, run.Failed = false, run.Failed+1
-				s.recordAddress(ctx, target, email, m.ID, store.Absent, false, err.Error())
-				continue
-			}
-			run.Updated++
-			s.recordAddress(ctx, target, email, m.ID, store.Absent, true, "")
-			continue
-		}
-
-		// Whoever the card says they are. A stray is by definition somebody
-		// the register has never heard of, so its address is all the page
-		// would otherwise have to show — and an address alone is not enough
-		// for the board to decide whether a card should go. Google knows the
-		// name; carry it across.
 		who := whoIs(card)
 
-		if held {
+		// Whether they moved between the two labels or left the register
+		// altogether, the treatment is the same and it is never deletion:
+		// the label comes off and the card stays. Only the wording differs,
+		// because "moved to the other list" and "no longer in the register"
+		// are different things for somebody reading the sync page.
+		m, known := byKey[s.cfg.Sync.MatchKey(email)]
+		moved := known && m.Current() && m.Kind != kind
+
+		if !s.cfg.Contacts.Pruning() && !moved {
 			run.OK, run.Failed = false, run.Failed+1
 			s.recordAddress(ctx, target, email, "", store.Absent, false,
-				fmt.Sprintf("%s has the registry's label but is not in the register. "+
-					"Would be deleted, but %d cards at once is more than "+
-					"max_removals_per_run (%d), so nothing was deleted.", who, doomed, brake))
+				who+" has the registry's label but is not in the register, and "+
+					"contacts.prune is off, so the label was left alone")
 			continue
 		}
-		if !s.cfg.Contacts.Pruning() {
-			run.OK, run.Failed = false, run.Failed+1
-			s.recordAddress(ctx, target, email, "", store.Absent, false,
-				who+" has the registry's label but is not in the register, and pruning is off")
-			continue
-		}
-		if err := s.gc.DeleteContact(ctx, mailbox, card.ResourceName); err != nil {
+
+		if err := s.gc.ModifyLabel(ctx, mailbox, label.ResourceName, nil,
+			[]string{card.ResourceName}); err != nil {
 			run.OK, run.Failed = false, run.Failed+1
 			s.recordAddress(ctx, target, email, "", store.Absent, false, err.Error())
 			continue
 		}
-		run.Removed++
-		s.log.Info("removed a stray contact", "mailbox", mailbox, "address", email, "name", who)
+		run.Updated++
+		if moved {
+			s.log.Info("moved a contact to the other label",
+				"mailbox", mailbox, "from", label.Name, "address", email, "name", who)
+		} else {
+			s.log.Info("took the registry's label off a contact; the card was kept",
+				"mailbox", mailbox, "label", label.Name, "address", email, "name", who)
+		}
+		s.recordAddress(ctx, target, email, "", store.Absent, true, "")
 	}
 	return touched
 }
@@ -263,6 +238,12 @@ func phones(m store.Member) []google.Phone {
 	return nil
 }
 
+// noteMark ends every note the registry writes, so that anybody looking at a
+// contact card can see where the line came from. A fixed string rather than
+// the configured site title, so that renaming the register does not leave two
+// generations of wording in the same address book.
+const noteMark = "· ur medlemsregistret"
+
 // note is the one line written into the contact's notes, so that looking
 // somebody up on a phone answers the two questions anybody actually has:
 // which sort of member is this, and how long have they been one.
@@ -275,8 +256,20 @@ func (s *Syncer) note(m store.Member) string {
 	if apt := strings.TrimSpace(m.Apartment); apt != "" {
 		parts = append(parts, "lgh "+apt)
 	}
-	parts = append(parts, "· ur "+s.cfg.Site.Title)
+	parts = append(parts, noteMark)
 	return strings.Join(parts, " ")
+}
+
+// ours reports whether the registry wrote this card, rather than finding it
+// already in somebody's address book.
+//
+// It matters because the two deserve opposite treatment. A card the registry
+// created for a member who has since left is its own litter, and deleting it
+// is tidying up. A card that was in the mailbox before the registry ever ran
+// is somebody's own contact — a name and a number that may exist nowhere
+// else — and the most the registry may do with it is take its label back off.
+func ours(p google.Person) bool {
+	return strings.Contains(p.Notes(), noteMark)
 }
 
 // changed reports whether the card Google holds differs from the one the

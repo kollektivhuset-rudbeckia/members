@@ -202,13 +202,19 @@ type Contacts struct {
 	Accounts []string `yaml:"accounts"`
 	// Labels names the contact group per kind of membership.
 	Labels map[Kind]string `yaml:"labels"`
-	// Prune deletes contacts that carry our label but are no longer in the
-	// registry. Only contacts inside the label are ever touched: somebody's
-	// dentist is none of the registry's business.
+	// Prune takes the registry's label off cards that carry it but are no
+	// longer in the register.
+	//
+	// It never deletes a card, whatever it is set to. A contact carries a
+	// name and a telephone number that may exist nowhere else, and these
+	// mailboxes are used for a great deal more than the register — so the
+	// most the registry does is take back its own label. Only cards inside
+	// that label are looked at at all: somebody's dentist is none of the
+	// registry's business.
 	Prune *bool `yaml:"prune"`
 }
 
-// Pruning reports whether stray contacts should be removed.
+// Pruning reports whether the registry's label should be taken off a stray.
 func (c Contacts) Pruning() bool { return c.Prune == nil || *c.Prune }
 
 // LabelFor is the contact-group name for a kind of membership.
@@ -269,9 +275,13 @@ type Sync struct {
 	// the board is told about it in as many words. Something that fixes itself
 	// on the next run was never worth a red banner.
 	AlertAfterMinutes int `yaml:"alert_after_minutes"`
-	// MaxRemovalsPerRun is a circuit breaker. A run that wants to take more
-	// than this many addresses out of a single group or label does nothing
-	// and reports instead.
+	// MaxRemovalsPerRun is a circuit breaker on the Google groups. A run that
+	// wants to take more than this many addresses out of one group does
+	// nothing and reports instead.
+	//
+	// Groups only. The address books have nothing to brake: the registry
+	// never deletes a card there, it only takes its own label off, and that
+	// is reversible on the next run.
 	//
 	// The board adds and loses a few members a year. A pass that wants to
 	// remove a dozen is not a busy week, it is a mistake — an empty register,

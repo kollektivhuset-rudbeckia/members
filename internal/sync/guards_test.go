@@ -4,7 +4,9 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -188,5 +190,57 @@ func TestAStrayContactIsNamed(t *testing.T) {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// The registry never deletes a contact card. Not for a stray, not for a
+// member who has left, not ever: a card carries a name and a number that may
+// exist nowhere else, and these mailboxes are used for more than the
+// register. When somebody no longer belongs under a label, the label comes
+// off and the card stays.
+//
+// This is enforced by there being no way to delete one — the Google client
+// has no DeleteContact — so the test that matters is over the source itself.
+// A rule in a comment can be forgotten by the next change; a missing method
+// cannot be called by one.
+func TestTheRegistryCannotDeleteAContact(t *testing.T) {
+	for _, path := range []string{"contacts.go", "sync.go", "sheet.go",
+		"../google/people.go", "../google/directory.go", "../google/sheets.go"} {
+		src, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		for _, forbidden := range []string{"DeleteContact", "deleteContact", "batchDeleteContacts"} {
+			// The prohibition is spelled out in a comment in people.go; it is
+			// a call that must not exist.
+			for _, line := range strings.Split(string(src), "\n") {
+				trimmed := strings.TrimSpace(line)
+				if strings.HasPrefix(trimmed, "//") {
+					continue
+				}
+				if strings.Contains(line, forbidden) {
+					t.Errorf("%s can delete a contact card: %s", path, trimmed)
+				}
+			}
+		}
+	}
+}
+
+// Taking a label off is not deleting, and it is what should happen instead.
+func TestUnlabellingIsNotBraked(t *testing.T) {
+	s, _ := guarded(t, guardConfig)
+	// The brake exists to stop irreversible loss. Nothing in the address-book
+	// pass is irreversible any more, so a limit there would only leave labels
+	// wrong until somebody noticed and raised it.
+	if s.cfg.Sync.MaxRemovalsPerRun != 5 {
+		t.Fatalf("the group brake changed: %d", s.cfg.Sync.MaxRemovalsPerRun)
+	}
+	src, err := os.ReadFile("contacts.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(src), "MaxRemovalsPerRun") {
+		t.Error("the address-book pass consults the removal brake; it has nothing " +
+			"destructive left to brake, so it would only get in the way")
 	}
 }

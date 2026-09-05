@@ -315,7 +315,7 @@ Målen är:
 |---|---|
 | `bomedlemmar@rudbeckia.nu` | håller exakt registrets bomedlemmar |
 | `friends@rudbeckia.nu` | håller exakt registrets vänmedlemmar |
-| Kontakter hos `ny@`, `styrelsen@`, `ekonomi@` | ett kontaktkort per medlem, under etiketten för medlemstypen |
+| Kontakter hos `ny@`, `styrelsen@`, `ekonomi@` | ett kontaktkort per medlem, under etiketten för medlemstypen. Kort läggs till och uppdateras; etiketter tas av; kort raderas aldrig |
 | Kalkylarket | fliken `Medlemmar` skrivs om helt |
 
 Den viktiga halvan av det här är inte rättandet utan rapporteringen. En tyst
@@ -339,6 +339,14 @@ Kontaktspeglingen rör **bara kort inne i registrets egna etiketter**. Vad
 kontots ägare i övrigt har i sin adressbok ser registret aldrig. Och den
 jämför innan den skriver, så ett oförändrat register gör inga anrop alls —
 det är det som gör att den kan gå var tionde minut i åratal.
+
+**Registret raderar aldrig ett kontaktkort.** Inte för en främling, inte för
+en medlem som gått ur, aldrig. Ett kort bär ett namn och ett telefonnummer
+som kanske inte finns någon annanstans, och brevlådorna används till mycket
+mer än registret. Hör någon inte längre hemma under en etikett tas etiketten
+av och kortet ligger kvar. Det är inte en regel någon skrivit ner utan något
+koden inte kan göra: Google-klienten har ingen metod för att radera en
+kontakt, och ett test underkänner bygget om någon lägger till en.
 
 ### Punkter i e-postadresser
 

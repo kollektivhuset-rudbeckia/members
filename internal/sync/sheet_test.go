@@ -165,11 +165,11 @@ func TestTheContactNoteSaysWhatSortOfMemberAndSinceWhen(t *testing.T) {
 
 	bo := store.Member{FirstName: "A", LastName: "B", Kind: config.KindBo,
 		Apartment: "1403", JoinedOn: joined}
-	if got := s.note(bo); got != "Bomedlem sedan 2022-03-01 lgh 1403 · ur Test" {
+	if got := s.note(bo); got != "Bomedlem sedan 2022-03-01 lgh 1403 · ur medlemsregistret" {
 		t.Errorf("resident note: %q", got)
 	}
 	van := store.Member{FirstName: "A", LastName: "B", Kind: config.KindVan, JoinedOn: joined}
-	if got := s.note(van); got != "Vänmedlem sedan 2022-03-01 · ur Test" {
+	if got := s.note(van); got != "Vänmedlem sedan 2022-03-01 · ur medlemsregistret" {
 		t.Errorf("friend note: %q", got)
 	}
 }
