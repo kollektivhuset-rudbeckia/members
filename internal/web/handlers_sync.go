@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"net/http"
 	"sort"
 	"strings"
@@ -110,6 +111,7 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request, v *view) {
 		"Trouble":  trouble,
 		"Runs":     runs,
 		"Last":     s.sync.Last(),
+		"Progress": s.sync.Progress(),
 		"On":       s.sync.Enabled(),
 		"Every":    s.cfg.Sync.Interval(),
 		"SA":       serviceAccountAddress(s),
@@ -141,23 +143,61 @@ func subjectOf(target string) string {
 	return target
 }
 
-// handleSyncNow reconciles on demand. It runs the pass in the request rather
-// than in the background, so that the page that comes back is the result
-// rather than a promise — which is the whole reason somebody presses it.
+// handleSyncNow starts a reconciliation and returns straight away.
+//
+// It used to run the pass inside the request and hand back the result, which
+// reads better on paper and does not survive contact with a first run: three
+// address books is several hundred calls to Google and minutes of waiting,
+// and the request times out long before. So the page says it has started and
+// then shows it happening.
+//
+// A `mal` parameter runs one target on its own, which is what you want when
+// one account is misbehaving and the other five are fine.
 func (s *Server) handleSyncNow(w http.ResponseWriter, r *http.Request, v *view) {
+	if err := r.ParseForm(); err != nil {
+		s.errorPage(w, r, http.StatusBadRequest, "error.form", "error.form.detail")
+		return
+	}
 	if !s.sync.Enabled() {
 		s.flash(w, "warn", "flash.syncoff")
 		http.Redirect(w, r, "/synk", http.StatusSeeOther)
 		return
 	}
-	report := s.sync.Once(r.Context(), sync.TriggerManual)
-	if report.OK() {
-		s.flash(w, "ok", "flash.synced")
-	} else {
-		s.flash(w, "error", "flash.syncfailed")
+
+	only := strings.TrimSpace(r.FormValue("mal"))
+	if only != "" && !s.knownTarget(only) {
+		s.flash(w, "error", "flash.notarget")
+		http.Redirect(w, r, "/synk", http.StatusSeeOther)
+		return
 	}
-	s.log.Info("synchronisation run by hand", "by", v.Session.Email, "ok", report.OK())
+
+	switch err := s.sync.Start(sync.TriggerManual, only); {
+	case errors.Is(err, sync.ErrBusy):
+		s.flash(w, "warn", "flash.syncbusy")
+	case err != nil:
+		s.log.Error("could not start a synchronisation", "err", err)
+		s.flash(w, "error", "flash.syncfailed")
+	case only != "":
+		s.flash(w, "ok", "flash.syncstarted.one", subjectOf(only))
+		s.log.Info("synchronisation of one target started by hand",
+			"by", v.Session.Email, "target", only)
+	default:
+		s.flash(w, "ok", "flash.syncstarted")
+		s.log.Info("synchronisation started by hand", "by", v.Session.Email)
+	}
 	http.Redirect(w, r, "/synk", http.StatusSeeOther)
+}
+
+// knownTarget guards the parameter against anything not in the configuration,
+// so a hand-typed address cannot make the reconciler chase something that is
+// not one of ours.
+func (s *Server) knownTarget(target string) bool {
+	for _, t := range s.cfg.Targets() {
+		if t == target {
+			return true
+		}
+	}
+	return false
 }
 
 // handleAuditLog is the board's record of everything anybody has done.

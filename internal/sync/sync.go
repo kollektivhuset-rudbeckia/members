@@ -76,8 +76,46 @@ type Syncer struct {
 	// failure, so a second one waits rather than starting.
 	running stdsync.Mutex
 
-	mu   stdsync.Mutex
-	last Report
+	mu       stdsync.Mutex
+	last     Report
+	progress Progress
+}
+
+// Progress is what a run is doing right now, for a page that has to say
+// something more useful than nothing while it works.
+//
+// A first run against three address books is several hundred calls to Google
+// and takes minutes. Without this the button either appears to do nothing or
+// times out, and the person presses it again.
+type Progress struct {
+	Running bool
+	// Only is the single target being reconciled, empty for all of them.
+	Only    string
+	Trigger Trigger
+	Since   time.Time
+	// Done and Total count targets, not addresses: it is the honest unit,
+	// because the reconciler does not know how much work a target holds
+	// until it has asked Google.
+	Done  int
+	Total int
+	// Now is the target being worked on.
+	Now string
+}
+
+// Progress reports what is happening, if anything.
+func (s *Syncer) Progress() Progress {
+	if s == nil {
+		return Progress{}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.progress
+}
+
+func (s *Syncer) setProgress(f func(*Progress)) {
+	s.mu.Lock()
+	f(&s.progress)
+	s.mu.Unlock()
 }
 
 // Report is what one whole pass did, per target.
@@ -183,17 +221,76 @@ func (s *Syncer) Run(ctx context.Context) {
 	}
 }
 
-// Once runs one full pass over every target.
+// Once runs one full pass over every target, waiting if another is running.
 func (s *Syncer) Once(ctx context.Context, trigger Trigger) Report {
+	return s.once(ctx, trigger, "", true)
+}
+
+// ErrBusy is returned when a run was asked for and one is already going.
+var ErrBusy = errors.New("a synchronisation is already running")
+
+// Start begins a run in the background and returns at once.
+//
+// only names a single target, or is empty for all of them. It refuses rather
+// than queues when one is already going: somebody pressing a button wants to
+// know whether it did anything, and "it will happen eventually" is not an
+// answer a page can act on.
+func (s *Syncer) Start(trigger Trigger, only string) error {
+	if !s.Enabled() {
+		return errors.New("no Google service account is configured")
+	}
+	if !s.running.TryLock() {
+		return ErrBusy
+	}
+	// The request that started this is long gone by the time it finishes, so
+	// the run gets a context of its own. The bound is generous: a first pass
+	// over three address books is several hundred calls to Google.
+	// Mark it running here rather than in the goroutine. The caller redirects
+	// to a page that asks "is anything happening?" immediately afterwards,
+	// and losing that race would answer no.
+	s.setProgress(func(p *Progress) {
+		*p = Progress{Running: true, Only: only, Trigger: trigger, Since: s.now()}
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	go func() {
+		defer cancel()
+		defer s.running.Unlock()
+		s.once(ctx, trigger, only, false)
+	}()
+	return nil
+}
+
+// once does the work. lock says whether to take the run lock, which Start has
+// already done for itself.
+func (s *Syncer) once(ctx context.Context, trigger Trigger, only string, lock bool) Report {
 	if !s.Enabled() {
 		return Report{At: s.now(), Trigger: trigger,
 			Err: errors.New("no Google service account is configured")}
 	}
-	s.running.Lock()
-	defer s.running.Unlock()
+	if lock {
+		s.running.Lock()
+		defer s.running.Unlock()
+	}
 
 	report := Report{At: s.now(), Trigger: trigger}
 	loc := s.cfg.Location()
+
+	wanted := func(target string) bool { return only == "" || only == target }
+	total := 0
+	for _, t := range s.cfg.Targets() {
+		if wanted(t) {
+			total++
+		}
+	}
+	s.setProgress(func(p *Progress) {
+		since := s.now()
+		if p.Running && !p.Since.IsZero() {
+			since = p.Since // Start already began the clock
+		}
+		*p = Progress{Running: true, Only: only, Trigger: trigger,
+			Since: since, Total: total}
+	})
+	defer s.setProgress(func(p *Progress) { p.Running, p.Now = false, "" })
 
 	members, err := s.store.Members(ctx, loc)
 	if err != nil {
@@ -223,14 +320,29 @@ func (s *Syncer) Once(ctx context.Context, trigger Trigger) Report {
 		}
 	}
 
+	step := func(target string, run func() store.SyncRun) {
+		if !wanted(target) {
+			return
+		}
+		s.setProgress(func(p *Progress) { p.Now = target })
+		report.Runs = append(report.Runs, run())
+		s.setProgress(func(p *Progress) { p.Done++ })
+	}
+
 	for _, g := range s.cfg.Groups {
-		report.Runs = append(report.Runs, s.syncGroup(ctx, trigger, g, want[g.Kind]))
+		g := g
+		step("group:"+g.Email, func() store.SyncRun {
+			return s.syncGroup(ctx, trigger, g, want[g.Kind])
+		})
 	}
 	for _, mailbox := range s.cfg.Contacts.Accounts {
-		report.Runs = append(report.Runs, s.syncContacts(ctx, trigger, mailbox, want, byKey))
+		mailbox := mailbox
+		step("contacts:"+mailbox, func() store.SyncRun {
+			return s.syncContacts(ctx, trigger, mailbox, want, byKey)
+		})
 	}
 	if s.cfg.Sheet.Enabled() {
-		report.Runs = append(report.Runs, s.syncSheet(ctx, trigger, members))
+		step("sheet", func() store.SyncRun { return s.syncSheet(ctx, trigger, members) })
 	}
 
 	for _, run := range report.Runs {

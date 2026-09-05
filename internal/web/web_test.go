@@ -601,3 +601,48 @@ func TestARoleRevokedInTheConfigurationLocksTheSessionOut(t *testing.T) {
 		t.Errorf("got %d, want a redirect to the sign-in", rec.Code)
 	}
 }
+
+// The sync button used to run the whole pass inside the request. A first pass
+// over three address books is several hundred calls to Google and minutes of
+// waiting, so the request timed out and the person pressed it again. It has
+// to start the work and say so.
+func TestSyncStartsInTheBackgroundAndSaysSo(t *testing.T) {
+	h := newHarness(t)
+	// Without a Google client there is nothing to start, and the page should
+	// say that rather than pretend.
+	rec := h.do(t, config.RoleBoard, "POST", "/synk/kor", url.Values{})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("got %d, want a redirect", rec.Code)
+	}
+	if got := rec.Header().Get("Location"); got != "/synk" {
+		t.Errorf("redirected to %q, want /synk", got)
+	}
+}
+
+// A hand-typed target must not send the reconciler after something that is
+// not one of ours.
+func TestSyncRefusesATargetItDoesNotKnow(t *testing.T) {
+	h := newHarness(t)
+	for _, target := range []string{"group:evil@example.test", "../../etc", "sheet2"} {
+		rec := h.do(t, config.RoleBoard, "POST", "/synk/kor", url.Values{"mal": {target}})
+		if rec.Code != http.StatusSeeOther {
+			t.Errorf("%q: got %d", target, rec.Code)
+		}
+	}
+	// And the ones from the configuration are accepted.
+	for _, target := range h.cfg.Targets() {
+		if !h.server.knownTarget(target) {
+			t.Errorf("%q is configured but not recognised", target)
+		}
+	}
+}
+
+func TestOnlyTheBoardCanStartASync(t *testing.T) {
+	h := newHarness(t)
+	for _, role := range []config.Role{config.RoleIntake, config.RoleCashier} {
+		rec := h.do(t, role, "POST", "/synk/kor", url.Values{})
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("%s: got %d, want 403", role, rec.Code)
+		}
+	}
+}

@@ -9,11 +9,32 @@
 	{{if and .Data.On (.May "sync")}}
 	<div class="hero-actions">
 		<form method="post" action="/synk/kor" class="inline">
-			<button type="submit" class="button primary">{{t "sync.now"}}</button>
+			<button type="submit" class="button primary" {{if .Data.Progress.Running}}disabled{{end}}>
+				{{if .Data.Progress.Running}}{{t "sync.running.short"}}{{else}}{{t "sync.now"}}{{end}}
+			</button>
 		</form>
 	</div>
 	{{end}}
 </div>
+
+{{with .Data.Progress}}
+{{if .Running}}
+{{/* While a run is going the page reloads itself. No JavaScript: this is the
+     one page somebody stares at waiting for something to finish, and it
+     should work in whatever browser the board has open. */}}
+<meta http-equiv="refresh" content="8">
+<aside class="alert alert-warn running" role="status">
+	<span class="spinner" aria-hidden="true"></span>
+	<span>
+		<strong>{{t "sync.running"}}</strong>
+		{{if .Only}}{{t "sync.running.one" .Only}}{{end}}
+		{{if .Total}}{{t "sync.running.progress" .Done .Total}}{{end}}
+		{{with .Now}}<code>{{.}}</code>{{end}}
+		<small class="muted">{{t "sync.running.since" (since (local .Since) $.Now)}}</small>
+	</span>
+</aside>
+{{end}}
+{{end}}
 
 {{if not .Data.On}}
 <section class="panel panel-warn">
@@ -83,6 +104,14 @@
 		<p class="alert alert-error">{{.Message}}</p>
 		{{end}}
 		{{with .Trouble}}<p class="badge badge-bad">{{t "sync.target.bad" (len .)}}</p>{{end}}
+		{{if and $.Data.On ($.May "sync")}}
+		<form method="post" action="/synk/kor" class="card-action">
+			<input type="hidden" name="mal" value="{{.Target}}">
+			<button type="submit" class="button small" {{if $.Data.Progress.Running}}disabled{{end}}>
+				{{t "sync.now.one"}}
+			</button>
+		</form>
+		{{end}}
 		{{with .Runs}}
 		<ul class="runs">
 			{{range .}}

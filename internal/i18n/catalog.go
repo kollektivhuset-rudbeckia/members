@@ -275,13 +275,19 @@ var catalog = map[string]entry{
 	"proposal.stale":       {"Inaktuellt", "Out of date"},
 
 	// --- synchronisation -----------------------------------------------------
-	"sync.title":    {"Synkronisering", "Synchronisation"},
-	"sync.lede":     {"Registret bestämmer. Var %s jämförs Googles grupper, kontakter och kalkylarket med det som står här, och skillnaden rättas.", "The register decides. Every %s the Google groups, contacts and the spreadsheet are compared with what is written here, and the difference is put right."},
-	"sync.now":      {"Synkronisera nu", "Synchronise now"},
-	"sync.off":      {"Ingenting synkroniseras", "Nothing is being synchronised"},
-	"sync.off.lede": {"Registret förs, men ingenting skrivs till Google.", "The register is kept, but nothing is written to Google."},
-	"sync.off.body": {"Det finns inget tjänstekonto konfigurerat, så grupperna, kontakterna och kalkylarket rörs inte. Medlemsregistret i sig fungerar precis som vanligt.", "No service account is configured, so the groups, the contacts and the spreadsheet are left alone. The register itself works exactly as usual."},
-	"sync.off.how":  {"Sätt GOOGLE_SERVICE_ACCOUNT_FILE och GOOGLE_ADMIN_SUBJECT och starta om. README:n beskriver hela uppsättningen.", "Set GOOGLE_SERVICE_ACCOUNT_FILE and GOOGLE_ADMIN_SUBJECT and restart. The README describes the whole setup."},
+	"sync.title":            {"Synkronisering", "Synchronisation"},
+	"sync.lede":             {"Registret bestämmer. Var %s jämförs Googles grupper, kontakter och kalkylarket med det som står här, och skillnaden rättas.", "The register decides. Every %s the Google groups, contacts and the spreadsheet are compared with what is written here, and the difference is put right."},
+	"sync.now":              {"Synkronisera allt nu", "Synchronise everything now"},
+	"sync.now.one":          {"Synkronisera bara den här", "Synchronise just this one"},
+	"sync.running":          {"Synkronisering pågår.", "A synchronisation is running."},
+	"sync.running.short":    {"Pågår…", "Running…"},
+	"sync.running.one":      {"Bara %s.", "Just %s."},
+	"sync.running.progress": {"%d av %d mål klara.", "%d of %d targets done."},
+	"sync.running.since":    {"startade för %s sedan", "started %s ago"},
+	"sync.off":              {"Ingenting synkroniseras", "Nothing is being synchronised"},
+	"sync.off.lede":         {"Registret förs, men ingenting skrivs till Google.", "The register is kept, but nothing is written to Google."},
+	"sync.off.body":         {"Det finns inget tjänstekonto konfigurerat, så grupperna, kontakterna och kalkylarket rörs inte. Medlemsregistret i sig fungerar precis som vanligt.", "No service account is configured, so the groups, the contacts and the spreadsheet are left alone. The register itself works exactly as usual."},
+	"sync.off.how":          {"Sätt GOOGLE_SERVICE_ACCOUNT_FILE och GOOGLE_ADMIN_SUBJECT och starta om. README:n beskriver hela uppsättningen.", "Set GOOGLE_SERVICE_ACCOUNT_FILE and GOOGLE_ADMIN_SUBJECT and restart. The README describes the whole setup."},
 
 	"sync.trouble":      {"%d saker stämmer inte", "%d things do not agree"},
 	"sync.trouble.lede": {"Varje rad är en adress som inte kom dit den skulle. Raderna som lyser rött har varit fel längre än en stund och behöver någon som tittar på dem.", "Each row is an address that did not get where it should. The rows lit red have been wrong for more than a moment and need somebody to look at them."},
@@ -375,6 +381,19 @@ var catalog = map[string]entry{
 	"flash.synced":          {"Synkroniseringen är klar och allt stämmer.", "The synchronisation finished and everything agrees."},
 	"flash.syncfailed":      {"Synkroniseringen gick igenom men något stämmer fortfarande inte. Se nedan.", "The synchronisation ran but something still does not agree. See below."},
 	"flash.syncoff":         {"Det finns inget att synkronisera mot.", "There is nothing to synchronise with."},
+	"flash.syncstarted": {
+		"Synkroniseringen är igång. Sidan uppdaterar sig medan den håller på.",
+		"The synchronisation is running. This page refreshes itself while it works.",
+	},
+	"flash.syncstarted.one": {
+		"Synkroniseringen av %s är igång.",
+		"The synchronisation of %s is running.",
+	},
+	"flash.syncbusy": {
+		"En synkronisering pågår redan. Vänta tills den är klar.",
+		"A synchronisation is already running. Wait until it has finished.",
+	},
+	"flash.notarget": {"Det där är inget mål registret känner till.", "That is not a target the register knows."},
 
 	// --- when something goes wrong -------------------------------------------
 	"error.home":          {"Till registret", "To the register"},

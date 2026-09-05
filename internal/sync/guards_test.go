@@ -244,3 +244,24 @@ func TestUnlabellingIsNotBraked(t *testing.T) {
 			"destructive left to brake, so it would only get in the way")
 	}
 }
+
+// Starting a run has to be non-blocking and has to refuse rather than queue:
+// somebody pressing a button wants to know whether it did anything, and
+// "eventually" is not an answer a page can act on.
+func TestStartIsNonBlockingAndRefusesWhenBusy(t *testing.T) {
+	s, _ := guarded(t, guardConfig)
+	// No Google client, so Start declines for that reason rather than busy.
+	if err := s.Start(TriggerManual, ""); err == nil {
+		t.Error("a syncer with nothing to sync against claimed to start")
+	}
+	if p := s.Progress(); p.Running {
+		t.Error("it reported a run in progress after refusing to start one")
+	}
+}
+
+func TestProgressIsSafeOnANilSyncer(t *testing.T) {
+	var s *Syncer
+	if p := s.Progress(); p.Running {
+		t.Error("a nil syncer reported a run in progress")
+	}
+}

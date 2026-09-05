@@ -567,3 +567,18 @@ code {
 .check-row code { font-size: .8em; }
 .pseudo-label { font-size: .85rem; color: var(--text-muted); }
 .pseudo-label small { color: var(--text-faint); }
+
+/* A run in progress. The page reloads itself every few seconds while this is
+   showing, so the spinner is reassurance rather than the mechanism. */
+.running { display: flex; align-items: center; gap: .75rem; }
+.spinner {
+	width: 1rem; height: 1rem; flex: 0 0 auto; border-radius: 50%;
+	border: 2px solid var(--accent-line); border-top-color: var(--accent);
+	animation: spin .9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+	.spinner { animation: none; border-top-color: var(--accent-line); }
+}
+.card-action { margin-top: .6rem; }
+.card-action .button { width: 100%; }
