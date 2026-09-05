@@ -35,7 +35,11 @@ func (s *Syncer) syncContacts(ctx context.Context, trigger Trigger, mailbox stri
 	// there is, and they are what -import reads.
 	total := 0
 	for _, kind := range config.Kinds {
-		total += len(want[kind])
+		for _, m := range want[kind] {
+			if m.Kind == kind {
+				total++
+			}
+		}
 	}
 	if total == 0 {
 		run.OK = false
@@ -62,8 +66,18 @@ func (s *Syncer) syncContacts(ctx context.Context, trigger Trigger, mailbox stri
 			s.recordTarget(ctx, target, false, err.Error())
 			return finish()
 		}
+		// Only the member's own kind, not the groups they have merely been
+		// added to. The extra membership exists so somebody can post to a
+		// mailing list; duplicating their contact card under a second label
+		// would say something about them that is not true.
+		var own []store.Member
+		for _, m := range want[kind] {
+			if m.Kind == kind {
+				own = append(own, m)
+			}
+		}
 		touched = append(touched, s.reconcileLabel(ctx, target, mailbox, kind,
-			label, cards, want[kind], byKey, &run)...)
+			label, cards, own, byKey, &run)...)
 	}
 
 	s.recordTarget(ctx, target, run.OK, run.Message)

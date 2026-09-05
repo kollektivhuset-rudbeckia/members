@@ -196,6 +196,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request, v *view) {
 	cw.Write([]string{
 		i18n.T(lang, "csv.name"), i18n.T(lang, "csv.firstname"), i18n.T(lang, "csv.lastname"),
 		i18n.T(lang, "csv.email"), i18n.T(lang, "csv.phone"), i18n.T(lang, "csv.kind"),
+		i18n.T(lang, "csv.alsoin"),
 		i18n.T(lang, "csv.apartment"), i18n.T(lang, "csv.joined"), i18n.T(lang, "csv.tenure"),
 		i18n.T(lang, "csv.status"), i18n.T(lang, "csv.fee"), i18n.T(lang, "csv.paid"),
 		i18n.T(lang, "csv.paidon"), i18n.T(lang, "csv.paidyears"), i18n.T(lang, "csv.note"),
@@ -216,7 +217,9 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request, v *view) {
 		}
 		cw.Write([]string{
 			m.Name(), m.FirstName, m.LastName, m.Email, m.Phone,
-			i18n.T(lang, kindKey(m.Kind)), m.Apartment,
+			i18n.T(lang, kindKey(m.Kind)),
+			strings.Join(kindStrings(m.AlsoIn), " "),
+			m.Apartment,
 			i18n.ISODate(m.JoinedOn.In(v.Loc)),
 			strconv.Itoa(row.Years),
 			statusWord(lang, row, left),

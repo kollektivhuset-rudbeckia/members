@@ -128,3 +128,32 @@ func TestAPopulatedRegisterIsNotHeldUp(t *testing.T) {
 	}()
 	s.syncGroup(context.Background(), TriggerStart, s.cfg.Groups[0], []store.Member{member})
 }
+
+// A bomedlem who has been added to the friends as well belongs in both
+// groups — that is the whole feature — but only under their own label in the
+// address books, because a contact card says who somebody is.
+func TestAnExtraGroupMembershipReachesTheGroupButNotTheAddressBook(t *testing.T) {
+	s, _ := guarded(t, guardConfig)
+	loc := s.cfg.Location()
+
+	resident := store.Member{
+		ID: "m1", FirstName: "Nora", LastName: "Ekwall",
+		Email: "nora@example.test", Kind: config.KindBo,
+		AlsoIn:   []config.Kind{config.KindVan},
+		JoinedOn: time.Date(2020, time.January, 1, 0, 0, 0, 0, loc),
+	}
+
+	if !resident.In(config.KindBo) || !resident.In(config.KindVan) {
+		t.Fatal("the member should be in both groups")
+	}
+
+	// The address-book pass filters to the member's own kind, so a run over
+	// the friends label sees nobody and the empty-register guard fires —
+	// which is the observable proof that the card is not duplicated.
+	run := s.syncContacts(context.Background(), TriggerStart, "styrelsen@example.test",
+		map[config.Kind][]store.Member{config.KindVan: {resident}},
+		map[string]store.Member{"nora@example.test": resident})
+	if run.Added != 0 {
+		t.Errorf("a contact card was created under a label that is not the member's kind")
+	}
+}

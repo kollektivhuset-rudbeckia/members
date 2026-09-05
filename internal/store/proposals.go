@@ -54,7 +54,11 @@ type Snapshot struct {
 	Apartment string      `json:"apartment"`
 	JoinedOn  string      `json:"joined_on"`
 	LeftOn    string      `json:"left_on,omitempty"`
-	Note      string      `json:"note"`
+	// AlsoIn is comma-separated rather than a slice so that a Snapshot stays
+	// comparable with ==, which is what tells the board that a member has
+	// been changed underneath a waiting proposal.
+	AlsoIn string `json:"also_in,omitempty"`
+	Note   string `json:"note"`
 }
 
 // SnapshotOf captures a member.
@@ -67,6 +71,7 @@ func SnapshotOf(m Member) Snapshot {
 		Kind:      m.Kind,
 		Apartment: m.Apartment,
 		JoinedOn:  day(m.JoinedOn),
+		AlsoIn:    encodeKinds(m.AlsoIn),
 		Note:      m.Note,
 	}
 	if m.LeftOn.Valid {
@@ -86,6 +91,7 @@ func (s Snapshot) Apply(m Member, loc *time.Location) (Member, error) {
 	m.FirstName, m.LastName = s.FirstName, s.LastName
 	m.Email, m.Phone = Email(s.Email), s.Phone
 	m.Kind, m.Apartment = s.Kind, s.Apartment
+	m.AlsoIn = decodeKinds(s.AlsoIn)
 	m.JoinedOn, m.Note = joined, s.Note
 	m.LeftOn = sql.NullTime{}
 	if s.LeftOn != "" {

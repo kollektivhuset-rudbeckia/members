@@ -86,13 +86,31 @@
 			.replace(/[åä]/g, 'a').replace(/ö/g, 'o').replace(/é/g, 'e');
 	}
 
-	// --- Hide the apartment for a member who does not live here -------------
+	// --- Follow the membership the form is set to ---------------------------
+	// The apartment only means anything for somebody who lives here, and
+	// "also in" offers the groups a member is not already in by virtue of
+	// their kind — offering their own would be a second way to say the same
+	// thing. Without JavaScript both stay visible, and the server ignores the
+	// combinations that make no sense.
 	var kind = document.querySelector('[data-kind-select]');
 	if (kind) {
 		var only = document.querySelectorAll('[data-only-kind]');
+		var notKind = document.querySelectorAll('[data-not-kind]');
 		var sync = function () {
 			only.forEach(function (field) {
 				field.hidden = field.getAttribute('data-only-kind') !== kind.value;
+			});
+			notKind.forEach(function (field) {
+				var same = field.getAttribute('data-not-kind') === kind.value;
+				field.hidden = same;
+				// A hidden tick must not be submitted: changing somebody's
+				// kind would otherwise leave them "also in" the group they
+				// have just moved out of.
+				if (same) {
+					field.querySelectorAll('input[type="checkbox"]').forEach(function (box) {
+						box.checked = false;
+					});
+				}
 			});
 		};
 		kind.addEventListener('change', sync);

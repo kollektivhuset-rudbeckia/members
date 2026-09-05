@@ -2,11 +2,13 @@ package sync
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/kollektivhuset-rudbeckia/members/internal/config"
 	"github.com/kollektivhuset-rudbeckia/members/internal/google"
 	"github.com/kollektivhuset-rudbeckia/members/internal/membership"
+	"github.com/kollektivhuset-rudbeckia/members/internal/store"
 )
 
 // Grid lays the register out for the cashiers' spreadsheet.
@@ -27,7 +29,7 @@ func Grid(r membership.Roster, cfg *config.Config, now time.Time) google.Grid {
 
 	header := []any{
 		"Namn", "Förnamn", "Efternamn", "E-post", "Telefon",
-		"Medlemstyp", "Lägenhet", "Medlem sedan", "År som medlem", "Status",
+		"Medlemstyp", "Även med i", "Lägenhet", "Medlem sedan", "År som medlem", "Status",
 		"Avgift i år", "Betalt i år", "Betaldatum",
 	}
 	for _, y := range years {
@@ -46,6 +48,7 @@ func Grid(r membership.Roster, cfg *config.Config, now time.Time) google.Grid {
 			m.Email,
 			m.Phone,
 			kindLabel(m.Kind),
+			alsoLabel(m),
 			m.Apartment,
 			m.JoinedOn.In(loc).Format("2006-01-02"),
 			s.Years,
@@ -111,6 +114,17 @@ func amountFor(s membership.Status, year int) any {
 		return kr
 	}
 	return ""
+}
+
+// alsoLabel names the extra groups a member has been added to, for the
+// cashiers' sheet — it is the column that explains why a bomedlem turns up on
+// the vänmedlemmarnas utskick.
+func alsoLabel(m store.Member) string {
+	var out []string
+	for _, k := range m.AlsoIn {
+		out = append(out, kindLabel(k))
+	}
+	return strings.Join(out, ", ")
 }
 
 func kindLabel(k config.Kind) string {

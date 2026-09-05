@@ -554,3 +554,16 @@ code {
 @media (prefers-reduced-motion: reduce) {
 	* { transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* A member who has been added to the other group as well — a bomedlem who
+   runs a matlag and has to be able to write to the vänmedlemmar. Marked
+   rather than blended in, because it is the exception. */
+.chip-extra {
+	background: transparent; color: var(--text-muted);
+	border: 1px dashed var(--line); font-size: .7rem;
+}
+.check-row { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+.check-row .checkbox { margin: 0; }
+.check-row code { font-size: .8em; }
+.pseudo-label { font-size: .85rem; color: var(--text-muted); }
+.pseudo-label small { color: var(--text-faint); }

@@ -12,6 +12,7 @@
 		<h1>{{with $m.Name}}{{.}}{{else}}{{t "noname"}}{{end}}</h1>
 		<p class="lede">
 			<span class="chip chip-{{$m.Kind}}">{{t (printf "kind.%s" $m.Kind)}}</span>
+			{{range $m.AlsoIn}}<span class="chip chip-extra" title="{{t "form.alsoin.hint"}}">+ {{t (printf "kind.%s" .)}}</span>{{end}}
 			{{template "feebadge" $s}}
 			{{if not $s.Current}}<span class="badge badge-quiet">{{t "member.left" (dateShort (local $m.LeftOn.Time))}}</span>{{end}}
 		</p>
@@ -49,7 +50,10 @@
 		{{if not $s.Current}}
 		<div><dt>{{t "form.left"}}</dt><dd>{{dateLong (local $m.LeftOn.Time)}}</dd></div>
 		{{end}}
-		<div><dt>{{t "member.group"}}</dt><dd>{{with .Data.Group}}<code>{{.}}</code>{{else}}<span class="muted">–</span>{{end}}</dd></div>
+		<div><dt>{{t "member.group"}}</dt><dd>
+			{{with .Data.Group}}<code>{{.}}</code>{{else}}<span class="muted">–</span>{{end}}
+			{{range .Data.AlsoGroups}}<br><code>{{.}}</code> <small class="muted">{{t "member.alsoin"}}</small>{{end}}
+		</dd></div>
 		{{with $m.Note}}<div><dt>{{t "form.note"}}</dt><dd>{{.}}</dd></div>{{end}}
 	</dl>
 </section>

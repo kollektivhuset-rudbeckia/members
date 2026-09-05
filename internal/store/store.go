@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS members (
 	apartment    TEXT NOT NULL DEFAULT '',
 	joined_on    TEXT NOT NULL,
 	left_on      TEXT,
+	also_in      TEXT NOT NULL DEFAULT '',
 	note         TEXT NOT NULL DEFAULT '',
 	created_at   TEXT NOT NULL,
 	created_by   TEXT NOT NULL DEFAULT '',
@@ -154,7 +155,47 @@ func Open(path string) (*Store, error) {
 	if _, err := db.Exec(schema); err != nil {
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
+	if err := migrate(db); err != nil {
+		return nil, err
+	}
 	return &Store{db: db}, nil
+}
+
+// migrate adds columns that arrived after the first release. A register that
+// has been running since before a column existed keeps its members and its
+// history; the column is added empty, which is the right default for every
+// one of them so far.
+func migrate(db *sql.DB) error {
+	have, err := columns(db, "members")
+	if err != nil {
+		return err
+	}
+	// also_in: the groups a member belongs to beyond their own kind. A
+	// bomedlem who runs a matlag needs to reach the vänmedlemmar, and before
+	// this column that was done by hand in a keep-list that nobody could see.
+	if !have["also_in"] {
+		if _, err := db.Exec(`ALTER TABLE members ADD COLUMN also_in TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add column also_in: %w", err)
+		}
+	}
+	return nil
+}
+
+func columns(db *sql.DB, table string) (map[string]bool, error) {
+	rows, err := db.Query(`SELECT name FROM pragma_table_info(?)`, table)
+	if err != nil {
+		return nil, fmt.Errorf("read the columns of %s: %w", table, err)
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		out[name] = true
+	}
+	return out, rows.Err()
 }
 
 // Close releases the database handle.

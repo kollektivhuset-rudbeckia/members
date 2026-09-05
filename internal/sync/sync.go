@@ -205,12 +205,21 @@ func (s *Syncer) Once(ctx context.Context, trigger Trigger) Report {
 
 	// Only current members belong in a group or an address book. Somebody who
 	// has left keeps their row and their history and loses their mail.
+	// A member belongs in the group for their own kind, and in any group they
+	// have been added to as well — a bomedlem who runs a matlag has to be
+	// able to write to the vänmedlemmar, and Google only takes post from
+	// somebody who is in the group.
 	want := map[config.Kind][]store.Member{}
 	byKey := map[string]store.Member{}
 	for _, m := range members {
 		byKey[s.cfg.Sync.MatchKey(m.Email)] = m
-		if m.Current() {
-			want[m.Kind] = append(want[m.Kind], m)
+		if !m.Current() {
+			continue
+		}
+		for _, kind := range config.Kinds {
+			if m.In(kind) {
+				want[kind] = append(want[kind], m)
+			}
 		}
 	}
 

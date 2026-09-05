@@ -119,7 +119,10 @@
 						<a href="/medlem/{{.Member.ID}}">{{with .Member.Name}}{{.}}{{else}}{{t "noname"}}{{end}}</a>
 						{{with .Member.Note}}<small class="muted">{{.}}</small>{{end}}
 					</td>
-					<td><span class="chip chip-{{.Member.Kind}}">{{t (printf "kind.%s" .Member.Kind)}}</span></td>
+					<td>
+						<span class="chip chip-{{.Member.Kind}}">{{t (printf "kind.%s" .Member.Kind)}}</span>
+						{{range .Member.AlsoIn}}<span class="chip chip-extra" title="{{t "form.alsoin.hint"}}">+{{t (printf "kind.%s" .)}}</span>{{end}}
+					</td>
 					<td class="cell-email"><a href="mailto:{{.Member.Email}}">{{.Member.Email}}</a></td>
 					<td>{{with .Member.Phone}}<a href="tel:{{.}}">{{.}}</a>{{else}}<span class="muted">–</span>{{end}}</td>
 					<td>{{with .Member.Apartment}}{{.}}{{else}}<span class="muted">–</span>{{end}}</td>

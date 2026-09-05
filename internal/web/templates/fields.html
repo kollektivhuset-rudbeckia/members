@@ -63,6 +63,20 @@
 		<small class="hint">{{t "form.kind.hint"}}</small>
 		{{with $f.Err "kind"}}<small class="field-error">{{t .}}</small>{{end}}
 	</div>
+	<div class="field field-wide">
+		<span class="pseudo-label">{{t "form.alsoin"}} <small>{{t "optional"}}</small></span>
+		<div class="check-row">
+			{{range .Kinds}}
+			<label class="checkbox" data-not-kind="{{.Kind}}">
+				<input type="checkbox" name="ocksa" value="{{.Kind}}"
+				       {{if $f.AlsoInKind .Kind}}checked{{end}}>
+				<span>{{.Label}}{{with .Group}} — <code>{{.}}</code>{{end}}</span>
+			</label>
+			{{end}}
+		</div>
+		<small class="hint">{{t "form.alsoin.hint"}}</small>
+		{{with $f.Err "alsoin"}}<small class="field-error">{{t .}}</small>{{end}}
+	</div>
 	<div class="field" data-only-kind="bo">
 		<label for="lagenhet">{{t "form.apartment"}} <small>{{t "optional"}}</small></label>
 		<input id="lagenhet" name="lagenhet" type="text" value="{{$f.Apartment}}"

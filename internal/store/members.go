@@ -33,7 +33,14 @@ type Member struct {
 	JoinedOn time.Time
 	// LeftOn is set when a membership ends. A former member keeps their row —
 	// the association wants to know it had them — but leaves every group.
-	LeftOn    sql.NullTime
+	LeftOn sql.NullTime
+	// AlsoIn are the groups this member belongs to beyond their own kind.
+	//
+	// A bomedlem who runs a matlag or arranges spelkvällar has to be able to
+	// write to the vänmedlemmar, and a Google group only accepts post from
+	// somebody who is in it. Before this was a column it was a hand-kept list
+	// in the configuration file that nobody could see and nobody updated.
+	AlsoIn    []config.Kind
 	Note      string
 	CreatedAt time.Time
 	CreatedBy string
@@ -49,6 +56,50 @@ func (m Member) Name() string {
 // Current reports whether the membership is still running.
 func (m Member) Current() bool { return !m.LeftOn.Valid }
 
+// In reports whether the member belongs in the group for a kind: either it is
+// their own kind, or they have been added to it as well.
+func (m Member) In(k config.Kind) bool {
+	if m.Kind == k {
+		return true
+	}
+	for _, extra := range m.AlsoIn {
+		if extra == k {
+			return true
+		}
+	}
+	return false
+}
+
+// Extra reports whether the member is in a kind's group only because somebody
+// put them there, which is what a page marks with "även med i".
+func (m Member) Extra(k config.Kind) bool { return m.Kind != k && m.In(k) }
+
+// encodeKinds and decodeKinds move the extra memberships in and out of their
+// column. Comma-separated rather than a table of its own: there are two kinds
+// and a member has at most one extra, so a join would be ceremony.
+func encodeKinds(kinds []config.Kind) string {
+	seen := map[config.Kind]bool{}
+	var out []string
+	for _, k := range kinds {
+		if k.Valid() && !seen[k] {
+			seen[k] = true
+			out = append(out, string(k))
+		}
+	}
+	sort.Strings(out)
+	return strings.Join(out, ",")
+}
+
+func decodeKinds(raw string) []config.Kind {
+	var out []config.Kind
+	for _, part := range strings.Split(raw, ",") {
+		if k, ok := config.ParseKind(part); ok {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
 // SortName is what an alphabetical list orders on: surname first, the way a
 // register has been sorted since long before there were computers.
 func (m Member) SortName() string {
@@ -56,20 +107,21 @@ func (m Member) SortName() string {
 }
 
 const memberCols = `id, first_name, last_name, email, phone, kind, apartment,
-	joined_on, left_on, note, created_at, created_by, updated_at, updated_by`
+	joined_on, left_on, also_in, note, created_at, created_by, updated_at, updated_by`
 
 // scanMember reads one row. loc is the association's timezone: the day
 // columns hold days, and a day only means something in a place.
 func scanMember(row interface{ Scan(...any) error }, loc *time.Location) (Member, error) {
 	var m Member
-	var kind, joined, created, updated string
+	var kind, joined, alsoIn, created, updated string
 	var left sql.NullString
 	err := row.Scan(&m.ID, &m.FirstName, &m.LastName, &m.Email, &m.Phone, &kind, &m.Apartment,
-		&joined, &left, &m.Note, &created, &m.CreatedBy, &updated, &m.UpdatedBy)
+		&joined, &left, &alsoIn, &m.Note, &created, &m.CreatedBy, &updated, &m.UpdatedBy)
 	if err != nil {
 		return m, err
 	}
 	m.Kind = mustKind(kind)
+	m.AlsoIn = decodeKinds(alsoIn)
 	if m.JoinedOn, err = ParseDay(joined, loc); err != nil {
 		return m, fmt.Errorf("member %s has an unreadable joined_on %q: %w", m.ID, joined, err)
 	}
@@ -102,9 +154,9 @@ func (s *Store) CreateMember(ctx context.Context, m Member) error {
 	m.Email = Email(m.Email)
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO members (`+memberCols+`)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		m.ID, m.FirstName, m.LastName, m.Email, m.Phone, string(m.Kind), m.Apartment,
-		day(m.JoinedOn), leftValue(m), m.Note,
+		day(m.JoinedOn), leftValue(m), encodeKinds(m.AlsoIn), m.Note,
 		utc(m.CreatedAt), m.CreatedBy, utc(m.UpdatedAt), m.UpdatedBy)
 	if isUnique(err) {
 		return ErrDuplicateEmail
@@ -118,10 +170,11 @@ func (s *Store) UpdateMember(ctx context.Context, m Member) error {
 	m.Email = Email(m.Email)
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE members SET first_name=?, last_name=?, email=?, phone=?, kind=?, apartment=?,
-			joined_on=?, left_on=?, note=?, updated_at=?, updated_by=?
+			joined_on=?, left_on=?, also_in=?, note=?, updated_at=?, updated_by=?
 		WHERE id=?`,
 		m.FirstName, m.LastName, m.Email, m.Phone, string(m.Kind), m.Apartment,
-		day(m.JoinedOn), leftValue(m), m.Note, utc(m.UpdatedAt), m.UpdatedBy, m.ID)
+		day(m.JoinedOn), leftValue(m), encodeKinds(m.AlsoIn), m.Note,
+		utc(m.UpdatedAt), m.UpdatedBy, m.ID)
 	if isUnique(err) {
 		return ErrDuplicateEmail
 	}

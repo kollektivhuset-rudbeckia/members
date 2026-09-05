@@ -31,6 +31,7 @@ type memberForm struct {
 	Email     string
 	Phone     string
 	Kind      string
+	AlsoIn    []string
 	Apartment string
 	JoinedOn  string
 	LeftOn    string
@@ -47,6 +48,17 @@ func (f memberForm) Bad() bool { return len(f.Errors) > 0 }
 // Err is what a template asks for a field's complaint.
 func (f memberForm) Err(field string) string { return f.Errors[field] }
 
+// AlsoInKind reports whether an extra group is ticked, for redrawing a form
+// that came back rejected.
+func (f memberForm) AlsoInKind(k config.Kind) bool {
+	for _, v := range f.AlsoIn {
+		if v == string(k) {
+			return true
+		}
+	}
+	return false
+}
+
 func readMemberForm(r *http.Request) memberForm {
 	return memberForm{
 		FirstName: strings.TrimSpace(r.FormValue("fornamn")),
@@ -54,6 +66,7 @@ func readMemberForm(r *http.Request) memberForm {
 		Email:     store.Email(r.FormValue("epost")),
 		Phone:     strings.TrimSpace(r.FormValue("telefon")),
 		Kind:      strings.TrimSpace(r.FormValue("typ")),
+		AlsoIn:    r.Form["ocksa"],
 		Apartment: strings.TrimSpace(r.FormValue("lagenhet")),
 		JoinedOn:  strings.TrimSpace(r.FormValue("medlem_sedan")),
 		LeftOn:    strings.TrimSpace(r.FormValue("uttradd")),
@@ -67,6 +80,7 @@ func formOf(m store.Member, loc *time.Location) memberForm {
 		FirstName: m.FirstName, LastName: m.LastName, Email: m.Email, Phone: m.Phone,
 		Kind: string(m.Kind), Apartment: m.Apartment, Note: m.Note,
 		JoinedOn: i18n.ISODate(m.JoinedOn.In(loc)),
+		AlsoIn:   kindStrings(m.AlsoIn),
 	}
 	if m.LeftOn.Valid {
 		f.LeftOn = i18n.ISODate(m.LeftOn.Time.In(loc))
@@ -90,6 +104,19 @@ func (f *memberForm) validate(loc *time.Location, now time.Time) (store.Member, 
 	kind, ok := config.ParseKind(f.Kind)
 	if !ok {
 		f.Errors["kind"] = "form.err.kind"
+	}
+	// A member is always in their own kind's group; ticking it as an extra
+	// would be a second, contradictory way to say the same thing.
+	var alsoIn []config.Kind
+	for _, raw := range f.AlsoIn {
+		extra, ok := config.ParseKind(raw)
+		if !ok {
+			f.Errors["alsoin"] = "form.err.kind"
+			continue
+		}
+		if extra != kind {
+			alsoIn = append(alsoIn, extra)
+		}
 	}
 
 	joined, err := store.ParseDay(f.JoinedOn, loc)
@@ -122,7 +149,8 @@ func (f *memberForm) validate(loc *time.Location, now time.Time) (store.Member, 
 	}
 	return store.Member{
 		FirstName: f.FirstName, LastName: f.LastName, Email: f.Email, Phone: f.Phone,
-		Kind: kind, Apartment: f.Apartment, JoinedOn: joined, LeftOn: left, Note: f.Note,
+		Kind: kind, AlsoIn: alsoIn, Apartment: f.Apartment,
+		JoinedOn: joined, LeftOn: left, Note: f.Note,
 	}, true
 }
 
@@ -212,17 +240,18 @@ func (s *Server) handleMember(w http.ResponseWriter, r *http.Request, v *view) {
 	status := membership.Compute(m, payments, s.cfg, s.now())
 	v.Title = m.Name()
 	v.Data = map[string]any{
-		"Member":    m,
-		"Status":    status,
-		"Form":      formOf(m, v.Loc),
-		"Kinds":     s.kindOptions(v.Lang),
-		"Payments":  payments,
-		"Proposals": proposals,
-		"Pending":   firstPending(proposals),
-		"Trail":     trail,
-		"Sync":      syncFor(states, m.Email),
-		"Years":     s.feeYears(status),
-		"Group":     s.groupFor(m.Kind),
+		"Member":     m,
+		"Status":     status,
+		"Form":       formOf(m, v.Loc),
+		"Kinds":      s.kindOptions(v.Lang),
+		"Payments":   payments,
+		"Proposals":  proposals,
+		"Pending":    firstPending(proposals),
+		"Trail":      trail,
+		"Sync":       syncFor(states, m.Email),
+		"Years":      s.feeYears(status),
+		"Group":      s.groupFor(m.Kind),
+		"AlsoGroups": s.groupsFor(m.AlsoIn),
 	}
 	s.render(w, r, http.StatusOK, "member.html", v)
 }
@@ -260,6 +289,17 @@ func (s *Server) feeYears(st membership.Status) []int {
 	out := make([]int, 0, st.Year-first+1)
 	for y := st.Year; y >= first; y-- {
 		out = append(out, y)
+	}
+	return out
+}
+
+// groupsFor is the addresses behind a set of extra memberships.
+func (s *Server) groupsFor(kinds []config.Kind) []string {
+	var out []string
+	for _, k := range kinds {
+		if address := s.groupFor(k); address != "" {
+			out = append(out, address)
+		}
 	}
 	return out
 }
@@ -363,7 +403,8 @@ func (s *Server) rerenderMember(w http.ResponseWriter, r *http.Request, v *view,
 		"Member": m, "Status": st, "Form": f, "Kinds": s.kindOptions(v.Lang),
 		"Payments": payments, "Proposals": proposals, "Pending": firstPending(proposals),
 		"Trail": trail, "Sync": syncFor(states, m.Email), "Years": s.feeYears(st),
-		"Group": s.groupFor(m.Kind), "OpenEditor": true,
+		"Group": s.groupFor(m.Kind), "AlsoGroups": s.groupsFor(m.AlsoIn),
+		"OpenEditor": true,
 	}
 	s.render(w, r, status, "member.html", v)
 }
@@ -474,11 +515,22 @@ func describeChange(before, after store.Member, loc *time.Location) string {
 	add("e-post", before.Email, after.Email)
 	add("telefon", before.Phone, after.Phone)
 	add("typ", string(before.Kind), string(after.Kind))
+	add("även med i", strings.Join(kindStrings(before.AlsoIn), " "),
+		strings.Join(kindStrings(after.AlsoIn), " "))
 	add("lägenhet", before.Apartment, after.Apartment)
 	add("medlem sedan", i18n.ISODate(before.JoinedOn.In(loc)), i18n.ISODate(after.JoinedOn.In(loc)))
 	add("utträdd", leftLabel(before, loc), leftLabel(after, loc))
 	add("anteckning", before.Note, after.Note)
 	return strings.Join(parts, "; ")
+}
+
+// kindStrings renders a set of memberships for a form or a log line.
+func kindStrings(kinds []config.Kind) []string {
+	out := make([]string, 0, len(kinds))
+	for _, k := range kinds {
+		out = append(out, string(k))
+	}
+	return out
 }
 
 func leftLabel(m store.Member, loc *time.Location) string {

@@ -31,6 +31,7 @@ func diff(p store.Proposal) []Change {
 		{"form.email", p.Before.Email, p.After.Email},
 		{"form.phone", p.Before.Phone, p.After.Phone},
 		{"form.kind", string(p.Before.Kind), string(p.After.Kind)},
+		{"form.alsoin", p.Before.AlsoIn, p.After.AlsoIn},
 		{"form.apartment", p.Before.Apartment, p.After.Apartment},
 		{"form.joined", p.Before.JoinedOn, p.After.JoinedOn},
 		{"form.left", p.Before.LeftOn, p.After.LeftOn},
