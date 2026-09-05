@@ -196,24 +196,85 @@ hr.rule { border: 0; border-top: 1px solid var(--line); margin: 1.5rem 0; }
 .topbar-inner {
 	max-width: var(--measure); margin: 0 auto;
 	padding: .7rem 1.25rem;
-	display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;
+	display: flex; align-items: center; gap: 1.25rem;
+	/* Deliberately no wrapping. A bar that spills onto a second line is not
+	   a bar; when it will not fit, the navigation scrolls instead. */
+	flex-wrap: nowrap;
 }
-.brand { display: flex; align-items: center; gap: .6rem; color: var(--text); text-decoration: none; }
+.brand { display: flex; align-items: center; gap: .6rem; color: var(--text); text-decoration: none; flex: 0 0 auto; }
 .brand-mark {
 	/* The house's own rudbeckia, the same file rudbeckia.nu uses. */
 	width: 32px; height: 32px; display: block; flex: 0 0 auto;
 }
 .brand-text { display: flex; flex-direction: column; line-height: 1.2; }
-.brand-text strong { font-weight: 600; font-size: 1rem; }
-.brand-text small { color: var(--text-muted); font-size: .75rem; }
-.topnav { display: flex; gap: 1.1rem; margin-left: auto; flex-wrap: wrap; }
+.brand-text strong { font-weight: 600; font-size: 1rem; white-space: nowrap; }
+.brand-text small { color: var(--text-muted); font-size: .75rem; white-space: nowrap; }
+.topnav {
+	display: flex; gap: 1.1rem; margin-left: auto; flex-wrap: nowrap;
+	overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;
+}
+.topnav::-webkit-scrollbar { display: none; }
+.topnav a { white-space: nowrap; }
 .topnav a {
 	color: var(--text-muted); text-decoration: none; font-size: .92rem;
 	padding: .2rem 0; border-bottom: 2px solid transparent;
 }
 .topnav a:hover { color: var(--text); }
 .topnav a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
-.topbar-actions { display: flex; align-items: center; gap: .75rem; }
+.topbar-actions { display: flex; align-items: center; gap: .75rem; flex: 0 0 auto; }
+
+/* ---------- The account menu ---------- */
+/* One button instead of four loose controls. A <details>, so it opens and
+   closes by itself with the keyboard before any script has run. */
+.account { position: relative; flex: 0 0 auto; }
+.account > summary {
+	list-style: none; cursor: pointer; display: flex; align-items: center; gap: .5rem;
+	padding: .3rem .55rem; border: 1px solid var(--line); border-radius: var(--radius-sm);
+	background: var(--bg-soft); box-shadow: var(--emboss); white-space: nowrap;
+}
+.account > summary::-webkit-details-marker { display: none; }
+.account > summary:hover { border-color: var(--accent-line); }
+.account-who { display: flex; flex-direction: column; line-height: 1.15; text-align: right; }
+.account-who strong { font-weight: 500; font-size: .85rem; }
+.account-who small { color: var(--text-faint); font-size: .68rem; }
+.caret { color: var(--text-faint); font-size: .7rem; }
+.account[open] .caret { transform: rotate(180deg); }
+
+.account-panel {
+	position: absolute; right: 0; top: calc(100% + .45rem); z-index: 40;
+	min-width: 15rem; padding: .5rem;
+	background: var(--bg); border: 1px solid var(--line);
+	border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.account-head {
+	margin: 0 0 .35rem; padding: .3rem .55rem .5rem;
+	font-size: .75rem; color: var(--text-faint);
+	border-bottom: 1px solid var(--line-soft); overflow-wrap: anywhere;
+}
+.account-links { display: grid; }
+.account-links a, .menu-item {
+	display: flex; align-items: center; gap: .5rem; width: 100%;
+	padding: .45rem .55rem; border-radius: var(--radius-sm);
+	font: inherit; font-size: .88rem; text-align: left;
+	color: var(--text); text-decoration: none;
+	background: none; border: 0; cursor: pointer;
+}
+.account-links a:hover, .menu-item:hover { background: var(--bg-sunk); color: var(--accent); }
+.account-links a[aria-current="page"] { color: var(--accent); }
+.account-row {
+	display: grid; margin-top: .35rem; padding-top: .35rem;
+	border-top: 1px solid var(--line-soft);
+}
+.account-out { margin-top: .35rem; padding-top: .35rem; border-top: 1px solid var(--line-soft); }
+
+/* The theme row names the mode it switches to, so only one label shows. */
+.only-dark { display: none; }
+:root[data-theme="dark"] .only-dark { display: inline; }
+:root[data-theme="dark"] .only-light { display: none; }
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) .only-dark { display: inline; }
+	:root:not([data-theme="light"]) .only-light { display: none; }
+}
 .icon-button {
 	background: var(--bg-soft); border: 1px solid var(--line); color: var(--text-muted);
 	border-radius: var(--radius-sm); padding: .35rem .45rem; cursor: pointer;
@@ -542,10 +603,16 @@ code {
 	font-family: var(--font-mono); font-size: .88em; overflow-wrap: anywhere;
 }
 
-@media (max-width: 44rem) {
-	.topbar-inner { gap: .75rem; }
+@media (max-width: 52rem) {
+	.topbar-inner { gap: .75rem; flex-wrap: wrap; }
 	.topnav { order: 3; width: 100%; margin-left: 0; gap: 1rem; }
 	.topbar-actions { margin-left: auto; }
+	.account { margin-left: auto; }
+	.account-who small { display: none; }
+	.brand-text small { display: none; }
+}
+
+@media (max-width: 44rem) {
 	.panel { padding: 1.15rem; border-radius: var(--radius); }
 	.page { padding: 1.5rem 1rem 3rem; }
 	.hero-row { flex-direction: column; }
@@ -746,3 +813,36 @@ textarea:hover { border-color: var(--base-300); }
 .sheet-close button:hover { color: var(--text); }
 
 .proposal.is-settled { opacity: .65; }
+
+/* ---------- The notification bell ---------- */
+/* Only rendered when there is something to do about it. A permanent item for
+   a queue that is empty most of the time is a permanent reminder of nothing. */
+.bell {
+	position: relative; display: flex; align-items: center; gap: .3rem;
+	flex: 0 0 auto; padding: .35rem .5rem; border-radius: var(--radius-sm);
+	color: var(--info-text); background: var(--info-bg); text-decoration: none;
+}
+.bell:hover { color: var(--info-text); filter: brightness(1.08); }
+.bell.is-here { outline: 2px solid var(--accent); outline-offset: 1px; }
+.bell-count { font-size: .78rem; font-weight: 600; }
+
+/* ---------- Tabs ---------- */
+.tabs {
+	display: flex; gap: .25rem; flex-wrap: wrap; margin-bottom: 1.5rem;
+	border-bottom: 1px solid var(--line);
+}
+.tabs a {
+	display: flex; align-items: center; gap: .4rem;
+	padding: .55rem .95rem; text-decoration: none; color: var(--text-muted);
+	border: 1px solid transparent; border-bottom: 0;
+	border-radius: var(--radius) var(--radius) 0 0; margin-bottom: -1px;
+}
+.tabs a:hover { color: var(--text); background: var(--bg-soft); }
+.tabs a[aria-current="page"] {
+	color: var(--text); background: var(--bg-soft);
+	border-color: var(--line); border-bottom: 1px solid var(--bg-soft);
+	font-weight: 500;
+}
+.tab-panel > .hero:first-child { margin-top: 0; }
+.card-link-whole { text-decoration: none; color: inherit; }
+.card-link-whole:hover { border-color: var(--accent); }

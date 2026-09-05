@@ -1,0 +1,46 @@
+{{define "content"}}
+<div class="hero">
+	<h1>{{t "admin.title"}}</h1>
+	<p class="lede">{{t "admin.lede"}}</p>
+</div>
+
+{{/* Tabs as links, so each one is an address somebody can bookmark or send
+     on, and so they work with no script at all. */}}
+<nav class="tabs" aria-label="{{t "admin.title"}}">
+	{{range .Data.Tabs}}
+	<a href="/admin?flik={{.ID}}" {{if .Current}}aria-current="page"{{end}}>
+		{{.Name}}
+		{{if .Bad}}<span class="tag tag-bad">{{.Count}}</span>
+		{{else if .Count}}<span class="tag">{{.Count}}</span>{{end}}
+	</a>
+	{{end}}
+</nav>
+
+<div class="tab-panel">
+	{{if eq .Data.Tab "synk"}}{{template "panel_sync" .}}
+	{{else if eq .Data.Tab "logg"}}{{template "panel_log" .}}
+	{{else}}{{template "panel_about" .}}{{end}}
+</div>
+{{end}}
+
+{{define "panel_about"}}
+<section class="panel">
+	<div class="panel-head"><h2>{{t "admin.about"}}</h2></div>
+	<dl class="facts-list">
+		<div><dt>{{t "admin.you"}}</dt><dd>{{.Session.Email}} — {{t (printf "role.%s" .Role)}}</dd></div>
+		<div><dt>{{t "admin.fee"}}</dt><dd>
+			{{money (fee "bo" .Now.Year)}} ({{.Now.Year}}){{if ne (fee "bo" .Now.Year) (fee "bo" (add .Now.Year 1))}}, {{money (fee "bo" (add .Now.Year 1))}} ({{add .Now.Year 1}}){{end}}
+		</dd></div>
+		<div><dt>{{t "admin.bankgiro"}}</dt><dd>{{with .Cfg.Membership.Bankgiro}}{{.}}{{else}}<span class="muted">–</span>{{end}}</dd></div>
+		<div><dt>{{t "admin.swish"}}</dt><dd>{{with .Cfg.Membership.Swish}}{{.}}{{else}}<span class="muted">–</span>{{end}}</dd></div>
+		<div><dt>{{t "nav.sheet"}}</dt><dd>
+			{{with .SheetURL}}<a href="{{.}}" target="_blank" rel="noopener">{{t "admin.sheet.open"}}<span aria-hidden="true"> ↗</span></a>
+			{{else}}<span class="muted">{{t "sync.none"}}</span>{{end}}
+		</dd></div>
+		<div><dt>{{t "admin.public"}}</dt><dd>
+			<a href="/bli-medlem" target="_blank" rel="noopener">{{.Data.JoinURL}}<span aria-hidden="true"> ↗</span></a>
+		</dd></div>
+	</dl>
+</section>
+{{end}}
+{{template "base" .}}

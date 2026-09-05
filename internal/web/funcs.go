@@ -129,6 +129,10 @@ func (s *Server) funcs(lang i18n.Lang) template.FuncMap {
 			return template.URL(uri)
 		},
 
+		// add is only ever "next year", which a template should not have to
+		// spell out as arithmetic.
+		"add": func(a, b int) int { return a + b },
+
 		"dict":      dict,
 		"hasPrefix": strings.HasPrefix,
 		"asset":     s.asset,

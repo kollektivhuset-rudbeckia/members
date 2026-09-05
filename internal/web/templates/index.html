@@ -86,7 +86,7 @@
 		</div>
 		{{if $q.Sort}}<input type="hidden" name="ordna" value="{{$q.Sort}}">{{end}}
 		{{if $q.Desc}}<input type="hidden" name="fallande" value="1">{{end}}
-		{{if ne $q.PerPage 50}}<input type="hidden" name="antal" value="{{$q.PerPage}}">{{end}}
+		{{if ne $q.PerPage $q.DefaultPerPage}}<input type="hidden" name="antal" value="{{$q.PerPage}}">{{end}}
 		<div class="filter-actions">
 			<button type="submit" class="button">{{t "filter.apply"}}</button>
 			{{if not $f.Empty}}<a class="button ghost" href="/">{{t "filter.clear"}}</a>{{end}}
@@ -124,7 +124,6 @@
 				<tr {{if not .Current}}class="is-former"{{end}}>
 					<td class="cell-name">
 						<a href="/medlem/{{.Member.ID}}">{{with .Member.Name}}{{.}}{{else}}{{t "noname"}}{{end}}</a>
-						{{with .Member.Note}}<small class="muted">{{.}}</small>{{end}}
 					</td>
 					<td>
 						<span class="chip chip-{{.Member.Kind}}">{{t (printf "kind.%s" .Member.Kind)}}</span>

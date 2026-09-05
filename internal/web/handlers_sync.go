@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"sort"
@@ -40,29 +41,102 @@ func (t targetView) Loud() bool {
 	return false
 }
 
-func (s *Server) handleSync(w http.ResponseWriter, r *http.Request, v *view) {
+// tab is one of the admin page's tabs.
+type tab struct {
+	ID      string
+	Name    string
+	Current bool
+	Count   int
+	Bad     bool
+}
+
+// handleAdmin is the things nobody opens during a normal week.
+//
+// The synchronisation and the log each earned a place in the top bar once and
+// kept it long after they stopped being daily work. They are tabs here now,
+// and the bar has the three places people actually go. Each tab is a plain
+// link with its own address, so one can be bookmarked or sent to somebody,
+// and none of it needs a script.
+func (s *Server) handleAdmin(w http.ResponseWriter, r *http.Request, v *view) {
 	ctx := r.Context()
 
+	tabs := []tab{{ID: "synk", Name: i18n.T(v.Lang, "nav.sync")}}
+	if v.May("approve") {
+		tabs = append(tabs, tab{ID: "logg", Name: i18n.T(v.Lang, "nav.log")})
+	}
+	tabs = append(tabs, tab{ID: "om", Name: i18n.T(v.Lang, "admin.about")})
+
+	chosen := strings.TrimSpace(r.URL.Query().Get("flik"))
+	known := false
+	for _, t := range tabs {
+		if t.ID == chosen {
+			known = true
+		}
+	}
+	if !known {
+		chosen = tabs[0].ID
+	}
+
+	data := map[string]any{
+		"Tab":     chosen,
+		"JoinURL": s.rt.BaseURL + "/bli-medlem",
+	}
+
+	switch chosen {
+	case "synk":
+		if err := s.syncPanel(ctx, v, data); err != nil {
+			s.log.Error("could not read the sync state", "err", err)
+			s.errorPage(w, r, http.StatusInternalServerError, "error.noread", "error.noread.how")
+			return
+		}
+	case "logg":
+		entries, err := s.store.Audit(ctx, 300)
+		if err != nil {
+			s.log.Error("could not read the audit trail", "err", err)
+			s.errorPage(w, r, http.StatusInternalServerError, "error.noread", "error.noread.how")
+			return
+		}
+		data["Entries"] = entries
+	}
+
+	// The counts on the tabs, which are the reason to open one.
+	for i := range tabs {
+		switch tabs[i].ID {
+		case "synk":
+			tabs[i].Count, tabs[i].Bad = v.Alarm.Loud, v.Alarm.Bad()
+			if !v.Alarm.Bad() {
+				tabs[i].Count = v.Alarm.Total
+			}
+		}
+		tabs[i].Current = tabs[i].ID == chosen
+	}
+	data["Tabs"] = tabs
+
+	v.Title = i18n.T(v.Lang, "admin.title")
+	v.Data = data
+	s.render(w, r, http.StatusOK, "admin.html", v)
+}
+
+// syncPanel gathers everything the synchronisation tab shows.
+func (s *Server) syncPanel(ctx context.Context, v *view, data map[string]any) error {
 	trouble, err := s.sync.Trouble(ctx, s.store)
 	if err != nil {
-		s.log.Error("could not read the sync state", "err", err)
-		s.errorPage(w, r, http.StatusInternalServerError, "error.noread", "error.noread.how")
-		return
+		return err
 	}
 	runs, err := s.store.SyncRuns(ctx, 120)
 	if err != nil {
-		s.log.Error("could not read the sync log", "err", err)
+		return err
 	}
 	states, err := s.store.SyncStates(ctx)
 	if err != nil {
-		s.log.Error("could not read the sync state", "err", err)
+		return err
 	}
 
 	byTarget := map[string]*targetView{}
 	order := []string{}
 	for _, target := range s.cfg.Targets() {
-		tv := &targetView{Target: target, OK: true, Kind: kindOf(target), Name: subjectOf(target)}
-		byTarget[target] = tv
+		byTarget[target] = &targetView{Target: target, OK: true,
+			Kind: kindOf(target), Name: subjectOf(target)}
 		order = append(order, target)
 	}
 	// A target that has since been taken out of the configuration can still
@@ -70,9 +144,8 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request, v *view) {
 	// no longer being kept in step, which somebody might not have meant.
 	for _, st := range states {
 		if _, ok := byTarget[st.Target]; !ok {
-			tv := &targetView{Target: st.Target, OK: true, Kind: kindOf(st.Target),
-				Name: subjectOf(st.Target)}
-			byTarget[st.Target] = tv
+			byTarget[st.Target] = &targetView{Target: st.Target, OK: true,
+				Kind: kindOf(st.Target), Name: subjectOf(st.Target)}
 			order = append(order, st.Target)
 		}
 		if st.WholeTarget() {
@@ -105,21 +178,18 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request, v *view) {
 		return false
 	})
 
-	v.Title = i18n.T(v.Lang, "sync.title")
-	v.Data = map[string]any{
-		"Targets":  targets,
-		"Trouble":  trouble,
-		"Runs":     runs,
-		"Last":     s.sync.Last(),
-		"Progress": s.sync.Progress(),
-		"On":       s.sync.Enabled(),
-		"Every":    s.cfg.Sync.Interval(),
-		"SA":       serviceAccountAddress(s),
-		"Admin":    s.rt.Google.AdminSubject,
-		"SheetID":  s.cfg.Sheet.ID,
-		"SheetTab": s.cfg.Sheet.TabName(),
-	}
-	s.render(w, r, http.StatusOK, "sync.html", v)
+	data["Targets"] = targets
+	data["Trouble"] = trouble
+	data["Runs"] = runs
+	data["Last"] = s.sync.Last()
+	data["Progress"] = s.sync.Progress()
+	data["On"] = s.sync.Enabled()
+	data["Every"] = s.cfg.Sync.Interval()
+	data["SA"] = serviceAccountAddress(s)
+	data["Admin"] = s.rt.Google.AdminSubject
+	data["SheetID"] = s.cfg.Sheet.ID
+	data["SheetTab"] = s.cfg.Sheet.TabName()
+	return nil
 }
 
 func serviceAccountAddress(s *Server) string {
@@ -160,14 +230,14 @@ func (s *Server) handleSyncNow(w http.ResponseWriter, r *http.Request, v *view) 
 	}
 	if !s.sync.Enabled() {
 		s.flash(w, "warn", "flash.syncoff")
-		http.Redirect(w, r, "/synk", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin?flik=synk", http.StatusSeeOther)
 		return
 	}
 
 	only := strings.TrimSpace(r.FormValue("mal"))
 	if only != "" && !s.knownTarget(only) {
 		s.flash(w, "error", "flash.notarget")
-		http.Redirect(w, r, "/synk", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin?flik=synk", http.StatusSeeOther)
 		return
 	}
 
@@ -185,7 +255,7 @@ func (s *Server) handleSyncNow(w http.ResponseWriter, r *http.Request, v *view) 
 		s.flash(w, "ok", "flash.syncstarted")
 		s.log.Info("synchronisation started by hand", "by", v.Session.Email)
 	}
-	http.Redirect(w, r, "/synk", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin?flik=synk", http.StatusSeeOther)
 }
 
 // knownTarget guards the parameter against anything not in the configuration,
@@ -198,17 +268,4 @@ func (s *Server) knownTarget(target string) bool {
 		}
 	}
 	return false
-}
-
-// handleAuditLog is the board's record of everything anybody has done.
-func (s *Server) handleAuditLog(w http.ResponseWriter, r *http.Request, v *view) {
-	entries, err := s.store.Audit(r.Context(), 300)
-	if err != nil {
-		s.log.Error("could not read the audit trail", "err", err)
-		s.errorPage(w, r, http.StatusInternalServerError, "error.noread", "error.noread.how")
-		return
-	}
-	v.Title = i18n.T(v.Lang, "log.title")
-	v.Data = map[string]any{"Entries": entries}
-	s.render(w, r, http.StatusOK, "log.html", v)
 }

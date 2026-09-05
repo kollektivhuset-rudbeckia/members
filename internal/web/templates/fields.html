@@ -108,7 +108,7 @@
      so it works with JavaScript switched off. */}}
 {{define "pager"}}
 {{- $q := .Q}}{{$p := .Pages}}{{$base := .Base -}}
-{{if or (gt $p.Count 1) (gt $p.Total 25)}}
+{{if or (gt $p.Count 1) (gt $p.Total $q.Smallest)}}
 <nav class="pager" aria-label="{{t "pager.label"}}">
 	<p class="pager-count">
 		{{if gt $p.Total 0}}{{t "pager.showing" $p.First $p.Last $p.Total}}{{end}}

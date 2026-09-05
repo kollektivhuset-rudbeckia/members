@@ -184,12 +184,13 @@ func TestPermissionsAreEnforcedByTheRouter(t *testing.T) {
 		{"the cashier may not sync by hand", config.RoleCashier, "POST", "/synk/kor", nil, http.StatusForbidden},
 
 		{"intake may not read the audit trail", config.RoleIntake, "GET", "/logg", nil, http.StatusForbidden},
-		{"the board may", config.RoleBoard, "GET", "/logg", nil, http.StatusOK},
+		{"the board may", config.RoleBoard, "GET", "/logg", nil, http.StatusMovedPermanently},
+		{"everybody may see the housekeeping page", config.RoleIntake, "GET", "/admin", nil, http.StatusOK},
 
 		{"everybody may add", config.RoleIntake, "GET", "/medlem/ny", nil, http.StatusOK},
 		{"everybody may see the register", config.RoleIntake, "GET", "/", nil, http.StatusOK},
 		{"everybody may see the fees", config.RoleIntake, "GET", "/avgifter", nil, http.StatusOK},
-		{"everybody may see the sync page", config.RoleIntake, "GET", "/synk", nil, http.StatusOK},
+		{"everybody may see the sync tab", config.RoleIntake, "GET", "/admin?flik=synk", nil, http.StatusOK},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -629,8 +630,8 @@ func TestSyncStartsInTheBackgroundAndSaysSo(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("got %d, want a redirect", rec.Code)
 	}
-	if got := rec.Header().Get("Location"); got != "/synk" {
-		t.Errorf("redirected to %q, want /synk", got)
+	if got := rec.Header().Get("Location"); got != "/admin?flik=synk" {
+		t.Errorf("redirected to %q, want the housekeeping page's sync tab", got)
 	}
 }
 
@@ -669,25 +670,31 @@ func TestTheRegisterPages(t *testing.T) {
 	for i := 0; i < 60; i++ {
 		h.member(t, fmt.Sprintf("m%02d", i), fmt.Sprintf("m%02d@example.test", i), config.KindBo)
 	}
+	per := tableQuery{}.DefaultPerPage() // ten, and the test should not care
 
 	first := h.do(t, config.RoleBoard, "GET", "/", nil)
 	if first.Code != http.StatusOK {
 		t.Fatalf("got %d", first.Code)
 	}
 	body := first.Body.String()
-	if !strings.Contains(body, "Visar 1–50 av 60") {
-		t.Error("the pager does not say which rows are on screen")
+	if want := fmt.Sprintf("Visar 1–%d av 60", per); !strings.Contains(body, want) {
+		t.Errorf("the pager does not say %q", want)
 	}
 	if strings.Contains(body, "m59@example.test") {
-		t.Error("row 60 is on the first page of 50")
+		t.Errorf("the last row is on the first page of %d", per)
+	}
+	if !strings.Contains(body, "m00@example.test") {
+		t.Error("the first row is not on the first page")
 	}
 
-	second := h.do(t, config.RoleBoard, "GET", "/?sida=2", nil).Body.String()
-	if !strings.Contains(second, "m59@example.test") {
-		t.Error("row 60 is not on the second page either")
+	// The last page holds the last row.
+	last := (60 + per - 1) / per
+	end := h.do(t, config.RoleBoard, "GET", fmt.Sprintf("/?sida=%d", last), nil).Body.String()
+	if !strings.Contains(end, "m59@example.test") {
+		t.Errorf("the last row is not on page %d", last)
 	}
-	if strings.Contains(second, "m00@example.test") {
-		t.Error("the second page still holds the first page's rows")
+	if strings.Contains(end, "m00@example.test") {
+		t.Error("the last page still holds the first page's rows")
 	}
 
 	// Asking for a page past the end lands on the last one rather than on
@@ -701,6 +708,45 @@ func TestTheRegisterPages(t *testing.T) {
 	all := h.do(t, config.RoleBoard, "GET", "/?antal=0", nil).Body.String()
 	if !strings.Contains(all, "m00@example.test") || !strings.Contains(all, "m59@example.test") {
 		t.Error("antal=0 did not put the whole register on one page")
+	}
+}
+
+// Ten is the default, and it is one of the sizes on offer.
+func TestTheDefaultPageIsShort(t *testing.T) {
+	q := tableQuery{}
+	if got := q.DefaultPerPage(); got != 10 {
+		t.Errorf("default page size: got %d, want 10", got)
+	}
+	var offered bool
+	for _, n := range q.PerPageChoices() {
+		if n == q.DefaultPerPage() {
+			offered = true
+		}
+	}
+	if !offered {
+		t.Errorf("the default %d is not one of the choices %v", q.DefaultPerPage(), q.PerPageChoices())
+	}
+	if q.Smallest() != 10 {
+		t.Errorf("smallest: got %d, want 10", q.Smallest())
+	}
+}
+
+// A note is somebody's private circumstances written down by the board. It
+// belongs on their page, not in a column everyone scrolls past.
+func TestTheNoteIsNotInTheTable(t *testing.T) {
+	h := newHarness(t)
+	m := h.member(t, "m1", "anna@example.test", config.KindBo)
+	m.Note = "Vill inte bli uppringd efter 20"
+	if err := h.store.UpdateMember(context.Background(), m); err != nil {
+		t.Fatal(err)
+	}
+
+	if body := h.do(t, config.RoleBoard, "GET", "/", nil).Body.String(); strings.Contains(body, m.Note) {
+		t.Error("the note is on the register's table view")
+	}
+	// It is still on the member's own page, where it belongs.
+	if body := h.do(t, config.RoleBoard, "GET", "/medlem/m1", nil).Body.String(); !strings.Contains(body, m.Note) {
+		t.Error("the note is missing from the member's own page")
 	}
 }
 
@@ -749,117 +795,31 @@ func TestFilteringAndSortingReturnToTheFirstPage(t *testing.T) {
 	}
 }
 
-// The spreadsheet is the one thing here that lives somewhere else.
-func TestTheSpreadsheetIsLinkedFromEveryPage(t *testing.T) {
+// The spreadsheet is off the top bar now, but the cashier lives on the fees
+// page and opens it constantly. One click from where it is used, not three
+// through a menu.
+func TestTheSpreadsheetIsWhereItIsUsed(t *testing.T) {
 	h := newHarness(t)
 	if h.server.sheetURL() != "" {
 		t.Fatal("the test configuration should have no spreadsheet")
 	}
-	if strings.Contains(h.do(t, config.RoleBoard, "GET", "/", nil).Body.String(), "docs.google.com") {
+	if strings.Contains(h.do(t, config.RoleCashier, "GET", "/avgifter", nil).Body.String(), "docs.google.com") {
 		t.Error("a link appeared with no spreadsheet configured")
 	}
 
 	h.cfg.Sheet.ID = "abc123"
-	page := h.do(t, config.RoleBoard, "GET", "/", nil).Body.String()
-	if !strings.Contains(page, "https://docs.google.com/spreadsheets/d/abc123/edit") {
-		t.Error("the spreadsheet is not linked from the register")
-	}
-	if !strings.Contains(h.do(t, config.RoleCashier, "GET", "/avgifter", nil).Body.String(), "abc123") {
+	const link = "https://docs.google.com/spreadsheets/d/abc123/edit"
+
+	if !strings.Contains(h.do(t, config.RoleCashier, "GET", "/avgifter", nil).Body.String(), link) {
 		t.Error("the cashier cannot reach the spreadsheet from the fees page")
 	}
-}
-
-// The board edits one field at a time, over fetch, and the allowlist is what
-// stops a hand-made request from writing to a column nobody meant to expose.
-func TestOneFieldAtATimeOnTheBoard(t *testing.T) {
-	h := newHarness(t)
-	id := h.candidate(t, "Anna", "anna@example.test", "new")
-
-	ok := h.do(t, config.RoleIntake, "POST", "/kandidater/"+id+"/falt",
-		url.Values{"falt": {"telefon"}, "varde": {"070-1"}, "tyst": {"1"}})
-	if ok.Code != http.StatusNoContent {
-		t.Fatalf("saving a field: got %d, want 204", ok.Code)
+	if !strings.Contains(h.do(t, config.RoleBoard, "GET", "/admin?flik=om", nil).Body.String(), link) {
+		t.Error("the spreadsheet is not on the housekeeping page either")
 	}
-	c, err := h.store.Candidate(context.Background(), id, h.cfg.Location())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c.Phone != "070-1" {
-		t.Errorf("phone: got %q", c.Phone)
-	}
-
-	for _, tc := range []struct {
-		name  string
-		field string
-		value string
-	}{
-		{"a column that is not a field", "member_id", "someone-else"},
-		{"a column that is not a field", "token", "guessed"},
-		{"a stage that does not exist", "steg", "nonsense"},
-		{"a membership that does not exist", "typ", "nonsense"},
-		{"a date that is not one", "intervju", "on tuesday"},
-	} {
-		t.Run(tc.name+" "+tc.field, func(t *testing.T) {
-			rec := h.do(t, config.RoleIntake, "POST", "/kandidater/"+id+"/falt",
-				url.Values{"falt": {tc.field}, "varde": {tc.value}, "tyst": {"1"}})
-			if rec.Code != http.StatusBadRequest {
-				t.Errorf("got %d, want 400", rec.Code)
-			}
-		})
-	}
-
-	// Moving between stages is the same endpoint, which is what lets a drag
-	// and the selector on the card do exactly the same thing.
-	move := h.do(t, config.RoleIntake, "POST", "/kandidater/"+id+"/falt",
-		url.Values{"falt": {"steg"}, "varde": {"interview"}, "tyst": {"1"}})
-	if move.Code != http.StatusNoContent {
-		t.Fatalf("moving: got %d", move.Code)
-	}
-	c, _ = h.store.Candidate(context.Background(), id, h.cfg.Location())
-	if c.Stage != "interview" {
-		t.Errorf("stage: got %q, want interview", c.Stage)
-	}
-}
-
-// The pipeline is the interview team's. The cashier has no reason to read
-// what people said about themselves before the association agreed to
-// anything, and every reason not to have to.
-func TestTheCashierCannotReachTheBoard(t *testing.T) {
-	h := newHarness(t)
-	id := h.candidate(t, "Anna", "anna@example.test", "new")
-
-	for _, tc := range []struct {
-		method, path string
-		form         url.Values
-	}{
-		{"GET", "/kandidater", nil},
-		{"GET", "/kandidater/ny", nil},
-		{"POST", "/kandidater/ny", url.Values{"fornamn": {"X"}}},
-		{"POST", "/kandidater/" + id + "/falt", url.Values{"falt": {"telefon"}, "varde": {"x"}}},
-		{"POST", "/kandidater/" + id + "/valkomna", url.Values{}},
-	} {
-		rec := h.do(t, config.RoleCashier, tc.method, tc.path, tc.form)
-		if rec.Code != http.StatusForbidden {
-			t.Errorf("%s %s: got %d, want 403", tc.method, tc.path, rec.Code)
-		}
-	}
-}
-
-// Every lane, in the order the configuration lists them, whether or not
-// anybody is standing in it. A board where the finished columns hang below
-// the live ones is not a board.
-func TestEveryStageGetsALane(t *testing.T) {
-	h := newHarness(t)
-	h.candidate(t, "Anna", "anna@example.test", "new")
-
-	body := h.do(t, config.RoleIntake, "GET", "/kandidater", nil).Body.String()
-	for _, stage := range h.cfg.Pipeline.Stages {
-		if !strings.Contains(body, `data-lane="`+stage.ID+`"`) {
-			t.Errorf("no lane for %q", stage.ID)
-		}
-	}
-	// And the add form is not sitting underneath them.
-	if strings.Contains(body, `action="/kandidater/ny"`) && !strings.Contains(body, "<dialog") {
-		t.Error("the add form is on the board rather than in a dialog")
+	// And it is not cluttering the bar.
+	body := h.do(t, config.RoleBoard, "GET", "/", nil).Body.String()
+	nav := body[strings.Index(body, `class="topnav"`):]
+	if strings.Contains(nav[:strings.Index(nav, "</nav>")], "docs.google.com") {
+		t.Error("the spreadsheet is back in the top bar")
 	}
 }

@@ -9,6 +9,7 @@
 		<p class="lede">{{t "fees.lede" $year}}</p>
 	</div>
 	<div class="hero-actions">
+		{{with .SheetURL}}<a class="button ghost" href="{{.}}" target="_blank" rel="noopener">{{t "nav.sheet"}}<span aria-hidden="true"> ↗</span></a>{{end}}
 		<form method="get" action="/avgifter" class="inline-form">
 			<label class="visually-hidden" for="ar">{{t "col.year"}}</label>
 			<select id="ar" name="ar" onchange="this.form.submit()">

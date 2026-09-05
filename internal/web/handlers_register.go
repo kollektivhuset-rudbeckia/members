@@ -27,11 +27,12 @@ type tableQuery struct {
 // perPageChoices are the page sizes on offer. 0 is "all", which stays
 // available because a register of a few hundred is small enough to want whole
 // sometimes — to print it, or to search the lot with the browser's own find.
-var perPageChoices = []int{25, 50, 100, 0}
+var perPageChoices = []int{10, 25, 50, 100, 0}
 
-// defaultPerPage keeps the first screen short without hiding most of a small
-// association behind a pager.
-const defaultPerPage = 50
+// defaultPerPage keeps the first screen short. Ten is a screenful without
+// scrolling on most machines, and the filter above the table is a better way
+// to find one person than a hundred rows are.
+const defaultPerPage = 10
 
 func readTableQuery(r *http.Request) tableQuery {
 	q := r.URL.Query()
@@ -208,6 +209,14 @@ func (t tableQuery) PerPageLink(base string, n int) string {
 
 // PerPageChoices is the sizes on offer, for the template.
 func (t tableQuery) PerPageChoices() []int { return perPageChoices }
+
+// DefaultPerPage lets a template tell an unusual page size from the ordinary
+// one without knowing the number itself.
+func (t tableQuery) DefaultPerPage() int { return defaultPerPage }
+
+// Smallest is the shortest page on offer, which is the point below which
+// there is nothing worth paging.
+func (t tableQuery) Smallest() int { return perPageChoices[0] }
 
 // SortLink is the address a column heading points at: the same view ordered
 // by that column, flipping the direction if it is already the one in use.

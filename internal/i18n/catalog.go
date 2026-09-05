@@ -39,13 +39,15 @@ var catalog = map[string]entry{
 	"since.now":        {"nyss", "just now"},
 
 	// --- layout --------------------------------------------------------------
-	"layout.skip":      {"Hoppa till innehållet", "Skip to the content"},
-	"layout.menu":      {"Huvudmeny", "Main menu"},
-	"layout.theme":     {"Byt mellan ljust och mörkt läge", "Switch between light and dark"},
-	"layout.language":  {"Byt språk till %s", "Change the language to %s"},
-	"layout.signout":   {"Logga ut", "Sign out"},
-	"layout.questions": {"Frågor?", "Questions?"},
-	"layout.demo":      {"Demoläge.", "Demo mode."},
+	"layout.skip":        {"Hoppa till innehållet", "Skip to the content"},
+	"layout.menu":        {"Huvudmeny", "Main menu"},
+	"layout.theme":       {"Byt mellan ljust och mörkt läge", "Switch between light and dark"},
+	"layout.theme.dark":  {"Mörkt läge", "Dark mode"},
+	"layout.theme.light": {"Ljust läge", "Light mode"},
+	"layout.language":    {"Byt språk till %s", "Change the language to %s"},
+	"layout.signout":     {"Logga ut", "Sign out"},
+	"layout.questions":   {"Frågor?", "Questions?"},
+	"layout.demo":        {"Demoläge.", "Demo mode."},
 	"layout.demo.body": {
 		"Alla medlemmar här är påhittade, ingenting synkroniseras mot Google, och allt försvinner när containern stoppas.",
 		"Every member here is invented, nothing is synchronised with Google, and it all disappears when the container stops.",
@@ -59,6 +61,7 @@ var catalog = map[string]entry{
 	"nav.sync":              {"Synk", "Sync"},
 	"nav.sync.trouble":      {"%d saker är inte synkroniserade", "%d things are not synchronised"},
 	"nav.log":               {"Logg", "Log"},
+	"nav.admin":             {"Skötsel", "Housekeeping"},
 	"nav.sheet":             {"Kalkylark", "Spreadsheet"},
 
 	// --- the roles -----------------------------------------------------------
@@ -407,7 +410,20 @@ var catalog = map[string]entry{
 	// --- the interview team's board ---------------------------------------
 	"nav.pipeline":         {"Kandidater", "Candidates"},
 	"nav.pipeline.waiting": {"%d kandidater är på väg", "%d candidates are on their way"},
-	"pipeline.title":       {"Kandidater", "Candidates"},
+	"admin.title":          {"Skötsel", "Housekeeping"},
+	"admin.lede": {
+		"Sådant man tittar på när något är fel, eller en gång om året.",
+		"The things you look at when something is wrong, or once a year.",
+	},
+	"admin.about":      {"Om registret", "About the register"},
+	"admin.you":        {"Du är inloggad som", "You are signed in as"},
+	"admin.fee":        {"Årsavgift", "Yearly fee"},
+	"admin.bankgiro":   {"Bankgiro", "Bankgiro"},
+	"admin.swish":      {"Swish", "Swish"},
+	"admin.sheet.open": {"Öppna kalkylarket", "Open the spreadsheet"},
+	"admin.public":     {"Sidan utåt", "The page facing outwards"},
+
+	"pipeline.title": {"Kandidater", "Candidates"},
 	"pipeline.lede": {
 		"De som är på väg mot huset, och var i processen de befinner sig. Den här sidan är intervjugruppens egen.",
 		"The people on their way towards the house, and how far they have got. This page is the interview team's own.",

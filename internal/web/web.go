@@ -61,12 +61,12 @@ type Server struct {
 // templates share one namespace per set.
 var pages = []string{
 	"index.html", "login.html", "error.html", "member.html", "new.html",
-	"payments.html", "proposals.html", "sync.html", "log.html",
+	"payments.html", "proposals.html", "admin.html",
 	"join.html", "thanks.html", "pipeline.html", "candidate_new.html",
 }
 
 // layouts are included in every page set.
-var layouts = []string{"base.html", "fields.html"}
+var layouts = []string{"base.html", "fields.html", "panels.html"}
 
 // New builds the HTTP server.
 func New(cfg *config.Config, rt config.Runtime, st *store.Store, guard *auth.Guard,
@@ -153,12 +153,18 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /andringar/{id}/avsla", s.can(config.PermApprove, s.handleReject))
 	mux.Handle("POST /andringar/{id}/aterta", s.page(s.handleWithdraw))
 
-	// --- synchronisation ---
-	mux.Handle("GET /synk", s.page(s.handleSync))
+	// --- the things nobody opens during a normal week ---
+	mux.Handle("GET /admin", s.page(s.handleAdmin))
 	mux.Handle("POST /synk/kor", s.can(config.PermSync, s.handleSyncNow))
 
-	// --- the audit trail ---
-	mux.Handle("GET /logg", s.can(config.PermApprove, s.handleAuditLog))
+	// The two pages these used to be. Banners and old bookmarks point here,
+	// and a redirect costs nothing next to a link that has stopped working.
+	mux.Handle("GET /synk", s.page(func(w http.ResponseWriter, r *http.Request, v *view) {
+		http.Redirect(w, r, "/admin?flik=synk", http.StatusMovedPermanently)
+	}))
+	mux.Handle("GET /logg", s.can(config.PermApprove, func(w http.ResponseWriter, r *http.Request, v *view) {
+		http.Redirect(w, r, "/admin?flik=logg", http.StatusMovedPermanently)
+	}))
 
 	return s.recoverPanic(securityHeaders(mux))
 }

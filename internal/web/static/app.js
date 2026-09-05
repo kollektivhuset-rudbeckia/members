@@ -292,6 +292,22 @@
 		});
 	})();
 
+	// --- Close the account menu the way people expect ----------------------
+	// It opens and closes on its own without this; all the script adds is
+	// clicking elsewhere, and Escape.
+	document.querySelectorAll('[data-menu]').forEach(function (menu) {
+		document.addEventListener('click', function (event) {
+			if (menu.open && !menu.contains(event.target)) { menu.open = false; }
+		});
+		menu.addEventListener('keydown', function (event) {
+			if (event.key === 'Escape' && menu.open) {
+				menu.open = false;
+				var summary = menu.querySelector('summary');
+				if (summary) { summary.focus(); }
+			}
+		});
+	});
+
 	// --- Open a form over the page instead of navigating to it --------------
 	document.querySelectorAll('[data-open-dialog]').forEach(function (link) {
 		var dialog = document.querySelector(link.getAttribute('data-open-dialog'));
