@@ -12,8 +12,8 @@ package payment
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"rsc.io/qr"
@@ -41,8 +41,11 @@ type Swish struct {
 	// and no external host. The Content-Security-Policy allows data: images
 	// for exactly this.
 	QR string
-	// Payload is what the QR encodes, kept for the test that has to read it.
-	Payload string
+	// Link is what the QR encodes: an app.swish.nu address. Worth having on
+	// its own, because a QR code is useless to somebody already reading the
+	// page on the phone they would pay with — they cannot scan their own
+	// screen. Following the link opens the same prefilled payment.
+	Link string
 }
 
 // Offered reports whether Swish is on offer at all.
@@ -59,49 +62,89 @@ func For(m config.Membership, kind config.Kind, year int, name string) (Ways, er
 	if !m.TakesSwish() {
 		return w, nil
 	}
-	payload, err := swishPayload(m.SwishNumber(), w.AmountKr, w.Reference)
+	link, err := swishLink(m.SwishNumber(), w.AmountKr, w.Reference)
 	if err != nil {
 		return w, err
 	}
-	png, err := qrPNG(payload)
+	png, err := qrPNG(link)
 	if err != nil {
 		return w, err
 	}
-	w.Swish = Swish{Number: strings.TrimSpace(m.Swish), QR: png, Payload: payload}
+	w.Swish = Swish{Number: strings.TrimSpace(m.Swish), QR: png, Link: link}
 	return w, nil
 }
 
-// swishPayload builds the JSON a Swish QR code carries.
+// swishBase is the address the Swish app answers to. Everything after it is
+// built by hand rather than with net/url, because the exact spelling matters
+// and net/url will not produce it: url.Values sorts its keys alphabetically
+// and encodes a space as "+", and this wants the parameters in Swish's own
+// order with spaces as %20.
+const swishBase = "https://app.swish.nu/1/p/sw/"
+
+// swishLink builds the address a Swish QR code carries.
 //
-// The shape is Swish's own: a payee, an amount and a message, each with a
-// flag saying whether the person paying may change it. Amount and message are
-// left editable on purpose — somebody paying for two, or wanting to add a
-// note, should not be stopped by a QR code — while the number they are paying
-// is not theirs to edit.
-func swishPayload(number string, amountKr int, message string) (string, error) {
+// This is Swish's own format, confirmed against the generator behind
+// swish.nu: a payee, an amount in kronor, the currency, the message, which
+// fields the payer may still change, and where the link came from.
+//
+//	https://app.swish.nu/1/p/sw/?sw=1231231231&amt=250&cur=SEK&msg=Medlemsavgift%20Åsa&edit=amt,msg&src=qr
+//
+// It is emphatically not the JSON that Swish's own HTTP API accepts. That
+// JSON is what you send them to have a picture drawn for you; putting it
+// inside a QR code yourself produces a code the Swish app cannot read, which
+// is exactly what this used to do.
+//
+// Amount and message are left editable on purpose — somebody paying for two,
+// or wanting to add a note, should not be stopped by a QR code — while the
+// number they are paying is not theirs to edit.
+func swishLink(number string, amountKr int, message string) (string, error) {
 	if number == "" {
 		return "", fmt.Errorf("no Swish number")
 	}
-	type value struct {
-		Value    any  `json:"value"`
-		Editable bool `json:"editable,omitempty"`
+	var b strings.Builder
+	b.WriteString(swishBase)
+	b.WriteString("?sw=")
+	b.WriteString(number)
+	if amountKr > 0 {
+		// The currency rides with the amount and is left out without one,
+		// which is what their generator does.
+		b.WriteString("&amt=")
+		b.WriteString(strconv.Itoa(amountKr))
+		b.WriteString("&cur=SEK")
 	}
-	payload := struct {
-		Version int   `json:"version"`
-		Payee   value `json:"payee"`
-		Amount  value `json:"amount"`
-		Message value `json:"message"`
-	}{
-		Version: 1,
-		Payee:   value{Value: number},
-		Amount:  value{Value: amountKr, Editable: true},
-		Message: value{Value: trim(message, 50), Editable: true},
+	if msg := trim(message, 50); msg != "" {
+		b.WriteString("&msg=")
+		b.WriteString(escape(msg))
 	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return "", err
+	b.WriteString("&edit=amt,msg&src=qr")
+	return b.String(), nil
+}
+
+// escape percent-encodes one query value exactly as Swish's own generator
+// does. Theirs is a browser, so the set it leaves alone is JavaScript's
+// encodeURIComponent set — the unreserved characters plus !~*'() — and a
+// space becomes %20, an Å becomes %C3%85 and an ampersand %26.
+//
+// Matching them character for character is not fussiness. It is what lets the
+// test next to this compare the two strings for equality and so notice if
+// Swish ever changes the format under us. A stricter encoder would decode to
+// the same thing in any correct parser, but it would also make that test
+// impossible to write.
+func escape(s string) string {
+	const hex = "0123456789ABCDEF"
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' ||
+			strings.IndexByte("-_.!~*'()", c) >= 0 {
+			b.WriteByte(c)
+			continue
+		}
+		b.WriteByte('%')
+		b.WriteByte(hex[c>>4])
+		b.WriteByte(hex[c&0x0f])
 	}
-	return string(raw), nil
+	return b.String()
 }
 
 // qrPNG encodes a payload as a data: URI.

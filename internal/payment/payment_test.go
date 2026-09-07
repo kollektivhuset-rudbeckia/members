@@ -2,7 +2,7 @@ package payment
 
 import (
 	"encoding/base64"
-	"encoding/json"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -37,6 +37,22 @@ func TestBankgiroAloneWhenThereIsNoSwish(t *testing.T) {
 	}
 }
 
+// The Swish link format is not published anywhere the association can cite,
+// so it was read off Swish's own generator rather than guessed. If it ever
+// needs re-checking, the recipe is:
+//
+//	curl -sS https://api.swish.nu/qr/v2/prefilled \
+//	  -H 'content-type: application/json' -H 'origin: https://www.swish.nu' \
+//	  --data-raw '{"size":600,"border":1,"payee":"1231231231","color":false,
+//	     "amount":{"value":250,"editable":true},
+//	     "message":{"value":"Medlemsavgift Åsa","editable":true}}' -o qr.png
+//	zbarimg --raw qr.png
+//
+// and the string that comes out should be the one this package builds for the
+// same three values. That JSON is the input to *their* drawing service; it is
+// not what belongs inside a QR code, and sending it there was the bug this
+// format replaced.
+
 func TestSwishCarriesTheNumberAmountAndReference(t *testing.T) {
 	m := membership()
 	m.Swish = "123 456 78 90"
@@ -52,40 +68,64 @@ func TestSwishCarriesTheNumberAmountAndReference(t *testing.T) {
 		t.Errorf("the number should read as a person writes it: %q", w.Swish.Number)
 	}
 
-	var payload struct {
-		Version int `json:"version"`
-		Payee   struct {
-			Value string `json:"value"`
-		} `json:"payee"`
-		Amount struct {
-			Value    float64 `json:"value"`
-			Editable bool    `json:"editable"`
-		} `json:"amount"`
-		Message struct {
-			Value    string `json:"value"`
-			Editable bool   `json:"editable"`
-		} `json:"message"`
+	// Spelled out in full rather than picked apart, because the whole point of
+	// this format is that it matches Swish's byte for byte. A QR code that is
+	// merely nearly right is a QR code that makes the app show an error, which
+	// is exactly what the hand-rolled JSON payload this replaced did.
+	const want = "https://app.swish.nu/1/p/sw/" +
+		"?sw=1234567890&amt=250&cur=SEK&msg=Medlemsavgift%20Anna%20Andersson" +
+		"&edit=amt,msg&src=qr"
+	if w.Swish.Link != want {
+		t.Errorf("link:\n got  %s\n want %s", w.Swish.Link, want)
 	}
-	if err := json.Unmarshal([]byte(w.Swish.Payload), &payload); err != nil {
-		t.Fatalf("the QR payload is not the JSON Swish expects: %v", err)
+}
+
+// The QR must carry the app's own address and nothing else. Swish's HTTP API
+// takes a JSON body describing a payment, and it is an easy and costly
+// mistake to think that JSON is also what belongs inside the code: the app
+// cannot read it, and the only symptom is an error message on somebody's
+// phone at the moment they were trying to pay us.
+func TestTheQRIsALinkAndNotJSON(t *testing.T) {
+	m := membership()
+	m.Swish = "1234567890"
+	w, err := For(m, config.KindBo, 2026, "Anna")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if payload.Version != 1 {
-		t.Errorf("version: got %d, want 1", payload.Version)
+	if !strings.HasPrefix(w.Swish.Link, "https://app.swish.nu/") {
+		t.Errorf("the QR should carry an app.swish.nu link: %q", w.Swish.Link)
 	}
-	// The digits alone, whatever spacing the configuration used.
-	if payload.Payee.Value != "1234567890" {
-		t.Errorf("payee: got %q", payload.Payee.Value)
+	if strings.HasPrefix(strings.TrimSpace(w.Swish.Link), "{") {
+		t.Error("the QR carries JSON again; the Swish app cannot read that")
 	}
-	if payload.Amount.Value != 250 {
-		t.Errorf("amount: got %v, want 250", payload.Amount.Value)
+}
+
+// Percent-encoding, matching the browser's encodeURIComponent, so that a
+// Swedish name survives the trip and an ampersand cannot end the parameter
+// early.
+func TestTheMessageIsEncodedLikeTheBrowserDoes(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{"Medlemsavgift Åsa Öberg", "Medlemsavgift%20%C3%85sa%20%C3%96berg"},
+		{"Anna & Per, lgh 42", "Anna%20%26%20Per%2C%20lgh%2042"},
+		{"Jean-Luc O'Brien", "Jean-Luc%20O'Brien"},
+		{"Zola/Müller +1", "Zola%2FM%C3%BCller%20%2B1"},
+		{"100% (2026)", "100%25%20(2026)"},
+	} {
+		if got := escape(tc.in); got != tc.want {
+			t.Errorf("escape(%q):\n got  %s\n want %s", tc.in, got, tc.want)
+		}
 	}
-	if payload.Message.Value != "Medlemsavgift Anna Andersson" {
-		t.Errorf("message: got %q", payload.Message.Value)
+}
+
+// Without an amount there is no currency either, which is what their
+// generator does and what the app expects.
+func TestNoAmountMeansNoCurrency(t *testing.T) {
+	link, err := swishLink("1234567890", 0, "Medlemsavgift")
+	if err != nil {
+		t.Fatal(err)
 	}
-	// Somebody paying for two, or wanting to add a note, must not be stopped
-	// by a QR code.
-	if !payload.Amount.Editable || !payload.Message.Editable {
-		t.Error("the amount and message should stay editable in the app")
+	if strings.Contains(link, "cur=") || strings.Contains(link, "amt=") {
+		t.Errorf("a link with no amount should carry neither amt nor cur: %s", link)
 	}
 }
 
@@ -126,20 +166,23 @@ func TestALongReferenceIsTrimmedOnARuneBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var payload struct {
-		Message struct {
-			Value string `json:"value"`
-		} `json:"message"`
-	}
-	if err := json.Unmarshal([]byte(w.Swish.Payload), &payload); err != nil {
-		t.Fatal(err)
-	}
-	if n := len([]rune(payload.Message.Value)); n > 50 {
+	msg := messageOf(t, w.Swish.Link)
+	if n := len([]rune(msg)); n > 50 {
 		t.Errorf("message is %d runes, want at most 50", n)
 	}
-	if strings.ContainsRune(payload.Message.Value, '�') {
-		t.Error("a character was cut in half")
+	if strings.ContainsRune(msg, '\uFFFD') {
+		t.Errorf("a character was cut in half: %q", msg)
 	}
+}
+
+// messageOf reads the msg parameter back out of a link, decoded.
+func messageOf(t *testing.T, link string) string {
+	t.Helper()
+	u, err := url.Parse(link)
+	if err != nil {
+		t.Fatalf("the link does not parse as a URL: %v", err)
+	}
+	return u.Query().Get("msg")
 }
 
 func TestTheFeeFollowsTheYear(t *testing.T) {

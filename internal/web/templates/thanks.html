@@ -35,9 +35,13 @@
 		{{if $p.Swish.Offered}}
 		<div class="pay-way">
 			<h3>{{t "join.pay.swish"}}</h3>
-			<img class="qr" src="{{pngData $p.Swish.QR}}" width="220" height="220"
-			     alt="{{t "join.pay.qr.alt" (money $p.AmountKr)}}">
+			<a class="qr-link" href="{{$p.Swish.Link}}">
+				<img class="qr" src="{{pngData $p.Swish.QR}}" width="220" height="220"
+				     alt="{{t "join.pay.qr.alt" (money $p.AmountKr)}}">
+			</a>
 			<p class="hint">{{t "join.pay.qr.how"}}</p>
+			<p class="swish-open"><a class="button primary" href="{{$p.Swish.Link}}">{{t "join.pay.swish.open"}}</a></p>
+			<p class="hint">{{t "join.pay.swish.onphone"}}</p>
 			<dl class="pay-facts">
 				<div><dt>{{t "join.pay.number"}}</dt><dd><strong>{{$p.Swish.Number}}</strong></dd></div>
 				<div><dt>{{t "join.pay.amount"}}</dt><dd>{{money $p.AmountKr}}</dd></div>

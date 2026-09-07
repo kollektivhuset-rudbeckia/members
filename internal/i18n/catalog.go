@@ -523,6 +523,8 @@ var catalog = map[string]entry{
 	"join.pay.bankgiro":      {"Med bankgiro", "By bank transfer"},
 	"join.pay.qr.how":        {"Öppna Swish, tryck på skanna, och rikta kameran hit. Belopp och meddelande är redan ifyllda.", "Open Swish, tap scan, and point the camera here. The amount and message are filled in already."},
 	"join.pay.qr.alt":        {"Swish-kod för %s", "Swish code for %s"},
+	"join.pay.swish.open":    {"Öppna i Swish", "Open in Swish"},
+	"join.pay.swish.onphone": {"Läser du det här på telefonen? Då kan du inte skanna koden från samma skärm — tryck på knappen i stället.", "Reading this on your phone? You cannot scan the code from the same screen — use the button instead."},
 	"join.pay.number":        {"Swish-nummer", "Swish number"},
 	"join.pay.bg":            {"Bankgiro", "Bankgiro"},
 	"join.pay.amount":        {"Belopp", "Amount"},

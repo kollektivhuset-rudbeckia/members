@@ -719,6 +719,15 @@ textarea:hover { border-color: var(--base-300); }
 	background: #fff; padding: .5rem; border-radius: var(--radius-sm);
 	image-rendering: pixelated;
 }
+/* The code is a link as well as a picture. Somebody already reading this on
+   their phone cannot scan their own screen, and tapping through opens the same
+   prefilled payment in the app. */
+.qr-link { display: inline-block; border-radius: var(--radius-sm); }
+.qr-link:hover .qr { outline: 2px solid var(--accent); outline-offset: 2px; }
+.qr-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.swish-open { margin: .85rem 0 .35rem; }
+.swish-open .button { width: 100%; }
+
 .pay-facts { margin: .9rem 0 0; display: grid; gap: .4rem; font-size: .9rem; }
 .pay-facts > div { display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
 .pay-facts dt { color: var(--text-faint); font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; min-width: 7rem; }
