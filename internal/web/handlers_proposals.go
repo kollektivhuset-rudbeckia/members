@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/kollektivhuset-rudbeckia/members/internal/i18n"
+	"github.com/kollektivhuset-rudbeckia/members/internal/membership"
 	"github.com/kollektivhuset-rudbeckia/members/internal/store"
 	"github.com/kollektivhuset-rudbeckia/members/internal/sync"
 )
@@ -180,6 +181,10 @@ func (s *Server) handleApprove(w http.ResponseWriter, r *http.Request, v *view) 
 		return
 	}
 	updated.UpdatedAt, updated.UpdatedBy = s.now(), v.Session.Email
+	// Again here, not only where the proposal was filed: a proposal written
+	// before this rule existed, or one that turns somebody into a resident by
+	// a route the form did not, still has to land with the note gone.
+	updated = membership.OnMovesIn(m, updated)
 
 	if err := s.store.UpdateMember(ctx, updated); err != nil {
 		if errors.Is(err, store.ErrDuplicateEmail) {

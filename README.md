@@ -285,6 +285,46 @@ Vill styrelsen kunna rätta en felprickning: `PAYMENT_ROLES=cashier,board`.
 
 ---
 
+## Vänmedlem, bomedlem, och vägen mellan dem
+
+Skillnaden mellan de två är vilken Google-grupp man ligger i, och ingenting
+annat i registret. Men vägen mellan dem är en riktig händelse i föreningen:
+
+**Att välkomna någon från kandidattavlan gör dem till vänmedlem.** Alltid, även
+om kortet säger att de är intresserade av att bo här. Att välkomna är att
+föreningen säger ja till att känna någon — inte att dela ut en lägenhet. Vad
+kandidaten själv önskade står kvar på kortet som det är: ett intresse.
+
+**Bomedlem blir man när man flyttar in**, och det är ett separat beslut en
+senare dag. Det görs genom att ändra medlemstypen på personens sida.
+
+**Anteckningen följer med som vänmedlem, men försvinner vid inflyttning.**
+Anteckningen från kandidattiden är intervjugruppens arbetsmaterial: vad någon
+sökte, hur samtalet gick, vilken lägenhet de hade i kikaren. Den är värd sin
+plats så länge personen väntar, och slutar vara det den dag de flyttar in —
+då är den ett gammalt omdöme om en granne, och den ligger inte bara i registret
+utan även i anteckningskolumnen i kassörernas kalkylark.
+
+Regeln gäller **bara vid övergången**. En anteckning som skrivs om en bomedlem
+efteråt är någon som medvetet skriver ner något om en granne, och den lämnas i
+fred. Varje borttagning hamnar i loggen med den gamla texten i sig, så den kan
+läsas tillbaka:
+
+```
+anteckning: "vill ha 3:a, intervjuad i mars" → ""
+```
+
+Reglen kom efter medlemmarna. För att ta bort anteckningarna hos dem som redan
+hade flyttat in finns ett engångskommando — kör alltid `-dry-run` först:
+
+```bash
+docker compose run --rm members -clear-resident-notes -dry-run
+docker compose run --rm members -clear-resident-notes
+```
+
+Det rör bara databasen på disk, behöver ingen Google-inloggning, och skriver en
+loggrad per medlem med den gamla texten.
+
 ## Avgifter
 
 Årsavgiften löper per kalenderår: en betalning täcker januari till december.

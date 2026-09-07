@@ -450,3 +450,34 @@ func ValidSort(key string) string {
 	}
 	return "name"
 }
+
+// MovesIn reports whether a change makes somebody a resident who was not one
+// before — the day they actually get a flat.
+//
+// It is the one transition the association treats as an event rather than an
+// edit. Somebody arrives as a friend member, waits, and one day moves in;
+// that is not the same kind of change as correcting their telephone number.
+func MovesIn(before, after store.Member) bool {
+	return before.Kind != config.KindBo && after.Kind == config.KindBo
+}
+
+// OnMovesIn applies what follows from somebody becoming a resident: the note
+// they carried as a friend member is dropped.
+//
+// That note is the interview team's own working context — what somebody said
+// they were after, how the conversation went, which flat they had their eye
+// on. It earns its place while they are waiting, and it stops earning it the
+// day they move in: from then on it is a stale remark about a neighbour,
+// sitting in the register and in the note column of the spreadsheet the
+// cashiers work in.
+//
+// Only at the transition. A note typed about a resident afterwards is
+// somebody deliberately writing down something about a neighbour, and this
+// leaves it alone — which is why the rule takes the previous version as well
+// as the new one, rather than being an invariant about residents.
+func OnMovesIn(before, after store.Member) store.Member {
+	if MovesIn(before, after) {
+		after.Note = ""
+	}
+	return after
+}

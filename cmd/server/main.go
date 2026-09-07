@@ -50,6 +50,8 @@ func main() {
 			"with -import: the note written on every imported member")
 		importBoard = flag.String("import-board", "",
 			"read a Focalboard candidate export and fill the pipeline from it, then exit")
+		clearBoNotes = flag.Bool("clear-resident-notes", false,
+			"empty the note on every current bomedlem, then exit; use with -dry-run first")
 	)
 	flag.Parse()
 
@@ -77,6 +79,14 @@ func main() {
 	if *importBoard != "" {
 		if err := runBoardImport(log, *importBoard, *dryRun); err != nil {
 			log.Error("the board import failed", "err", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if *clearBoNotes {
+		if err := runClearResidentNotes(log, *dryRun); err != nil {
+			log.Error("could not clear the notes", "err", err)
 			os.Exit(1)
 		}
 		return
@@ -416,4 +426,113 @@ func parseLevel(s string) slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+// runClearResidentNotes is the one-off pass that brings the register up to the
+// rule: a resident member carries no note from their time as a friend member.
+//
+// It exists because the rule arrived after the members did. Everybody who had
+// already moved in kept the interview note they were welcomed with, and those
+// notes are not only in the register — the note column goes into the
+// spreadsheet the cashiers work in.
+//
+// Every change is written to the audit trail with the old text in it, one line
+// per member, so nothing here is unrecoverable: the note can be read back off
+// the log and typed in again if any of it turns out to have been wanted.
+func runClearResidentNotes(log *slog.Logger, dryRun bool) error {
+	// Deliberately not config.LoadRuntime(): this touches nothing but the
+	// database on disk, and a local pass over local rows has no business
+	// refusing to run because an OAuth client is not configured. It reads the
+	// same two environment variables the server does, and nothing else.
+	configPath := envOr("CONFIG_PATH", "config.yaml")
+	dbPath := envOr("DB_PATH", "data/members.db")
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return err
+	}
+	st, err := store.Open(dbPath)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+
+	ctx := context.Background()
+	members, err := st.Members(ctx, cfg.Location())
+	if err != nil {
+		return err
+	}
+
+	var hit []store.Member
+	for _, m := range members {
+		if m.Kind == config.KindBo && strings.TrimSpace(m.Note) != "" {
+			hit = append(hit, m)
+		}
+	}
+
+	if len(hit) == 0 {
+		fmt.Println("Ingen bomedlem har någon anteckning. Ingenting att göra.")
+		return nil
+	}
+
+	fmt.Printf("\n%d bomedlemmar har en anteckning:\n\n", len(hit))
+	for _, m := range hit {
+		fmt.Printf("  %-28s %-32s %s\n", m.Name(), m.Email, quoteNote(m.Note))
+	}
+
+	if dryRun {
+		fmt.Printf("\n-dry-run: ingenting ändrades. Kör om utan -dry-run för att tömma dem.\n")
+		return nil
+	}
+
+	actor := envOr("ACCOUNT_BOARD", "")
+	if actor == "" {
+		// The trail has to name somebody, and a command run by hand is not a
+		// person. Saying so is better than borrowing an account's name.
+		actor = "-clear-resident-notes"
+	}
+	now := time.Now().In(cfg.Location())
+
+	var done int
+	for _, m := range hit {
+		before := m
+		m.Note = ""
+		m.UpdatedAt, m.UpdatedBy = now, actor
+		if err := st.UpdateMember(ctx, m); err != nil {
+			log.Error("could not clear a note", "member", before.Email, "err", err)
+			continue
+		}
+		// The old text goes in the trail, which is what makes this reversible.
+		err := st.Log(ctx, store.Entry{
+			At: now, Actor: actor, Role: string(config.RoleBoard),
+			Action: "member.changed", MemberID: before.ID,
+			Subject: before.Name() + " <" + before.Email + ">",
+			Detail:  "anteckning: " + quoteNote(before.Note) + " → \"\"; bomedlem behåller ingen anteckning från kandidattiden",
+		})
+		if err != nil {
+			log.Error("could not write the audit trail", "member", before.Email, "err", err)
+		}
+		done++
+	}
+
+	fmt.Printf("\nTömde anteckningen på %d av %d bomedlemmar.\n", done, len(hit))
+	fmt.Println("Gamla texter finns i loggen på skötselsidan om något behöver tillbaka.")
+	if done > 0 {
+		fmt.Println("Kalkylarkets anteckningskolumn uppdateras vid nästa synk.")
+	}
+	return nil
+}
+
+// quoteNote renders a note for the terminal and the trail, on one line.
+func quoteNote(s string) string {
+	return "\"" + strings.Join(strings.Fields(s), " ") + "\""
+}
+
+// envOr is os.Getenv with a fallback, for the commands that run without a
+// full runtime configuration.
+func envOr(key, fallback string) string {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		return v
+	}
+	return fallback
 }

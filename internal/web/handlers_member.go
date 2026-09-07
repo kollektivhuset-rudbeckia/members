@@ -356,6 +356,10 @@ func (s *Server) handleSave(w http.ResponseWriter, r *http.Request, v *view) {
 	updated.ID = existing.ID
 	updated.CreatedAt, updated.CreatedBy = existing.CreatedAt, existing.CreatedBy
 	updated.UpdatedAt, updated.UpdatedBy = s.now(), v.Session.Email
+	// Before the branch below, so that a proposal is filed for what would
+	// actually happen. The board approving a change should not be the moment
+	// a note quietly disappears from under them.
+	updated = membership.OnMovesIn(existing, updated)
 
 	if !v.May("edit") {
 		s.propose(w, r, v, existing, store.ProposeUpdate, store.SnapshotOf(updated), f.Reason)

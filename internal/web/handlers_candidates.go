@@ -357,12 +357,13 @@ func (s *Server) handleWelcomeCandidate(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	kind := c.Kind
-	if raw := r.FormValue("typ"); raw != "" {
-		if parsed, ok := config.ParseKind(raw); ok {
-			kind = parsed
-		}
-	}
+	// Always a friend member, whatever kind of membership the candidate said
+	// they were after. Welcoming somebody is the association saying yes to
+	// knowing them, not handing them a flat: bomedlem follows when they
+	// actually move in, and that is a separate decision on a separate day
+	// made by whoever allocates the flat. The candidate's own wish is kept on
+	// the card as what it is — an interest — rather than deciding this.
+	kind := config.KindVan
 	now := s.now()
 	m := store.Member{
 		ID: auth.ID(), FirstName: c.FirstName, LastName: c.LastName,
