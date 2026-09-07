@@ -140,12 +140,17 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /avgifter", s.page(s.handlePayments))
 
 	// --- the interview team's board ---
+	// Reading the board and working it are different permissions: the
+	// interview team owns the process, and the board watching is welcome
+	// where the board reaching in and moving somebody is not.
 	mux.Handle("GET /kandidater", s.can(config.PermPipeline, s.handleCandidates))
-	mux.Handle("GET /kandidater/ny", s.can(config.PermPipeline, s.handleNewCandidateForm))
-	mux.Handle("POST /kandidater/ny", s.can(config.PermPipeline, s.handleAddCandidate))
-	mux.Handle("POST /kandidater/{id}/falt", s.can(config.PermPipeline, s.handleCandidateField))
-	mux.Handle("POST /kandidater/{id}", s.can(config.PermPipeline, s.handleSaveCandidate))
-	mux.Handle("POST /kandidater/{id}/valkomna", s.can(config.PermPipeline, s.handleWelcomeCandidate))
+	mux.Handle("GET /kandidater/ny", s.can(config.PermPipelineEdit, s.handleNewCandidateForm))
+	mux.Handle("POST /kandidater/ny", s.can(config.PermPipelineEdit, s.handleAddCandidate))
+	mux.Handle("POST /kandidater/{id}/falt", s.can(config.PermPipelineEdit, s.handleCandidateField))
+	mux.Handle("POST /kandidater/{id}", s.can(config.PermPipelineEdit, s.handleSaveCandidate))
+	mux.Handle("POST /kandidater/{id}/valkomna", s.can(config.PermPipelineEdit, s.handleWelcomeCandidate))
+	mux.Handle("POST /kandidater/{id}/ta-bort", s.can(config.PermPipelineEdit, s.handleDeleteCandidate))
+	mux.Handle("POST /kandidater/rensa", s.can(config.PermPipelineEdit, s.handleClearStage))
 
 	// --- the board's approval queue ---
 	mux.Handle("GET /andringar", s.page(s.handleProposals))

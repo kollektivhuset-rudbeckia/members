@@ -1,55 +1,78 @@
 {{define "content"}}
+{{/* Whether this viewer works the board or only reads it. The interview team
+     owns the pipeline; the board is welcome to look. Computed once so that a
+     control and the route behind it cannot drift apart. */}}
+{{$edit := .May "pipeline.edit"}}
+
 <div class="hero hero-row">
 	<div>
 		<h1>{{t "pipeline.title"}}</h1>
 		<p class="lede">{{t "pipeline.lede"}}</p>
 	</div>
 	<div class="hero-actions">
+		{{if $edit}}
 		{{/* A link, so it works before any script has run. With JavaScript it
 		     opens over the board instead: leaving the board to write one name
 		     down and coming back to a lost scroll position is a small misery
 		     repeated all afternoon. */}}
 		<a class="button primary" href="/kandidater/ny" data-open-dialog="#ny-kandidat">{{t "pipeline.add"}}</a>
+		{{else}}
+		<span class="tag" title="{{t "pipeline.readonly.why"}}">{{t "pipeline.readonly"}}</span>
+		{{end}}
 	</div>
 </div>
 
-<div class="board" data-board>
+<div class="board" {{if $edit}}data-board{{end}}>
 	{{range .Data.Columns}}
 	<section class="lane {{if .Stage.Closed}}is-closed{{end}}" data-lane="{{.Stage.ID}}">
 		<header class="lane-head">
 			<h2>{{.Name}}</h2>
 			<span class="tag" data-lane-count>{{len .Candidates}}</span>
+			{{/* Only a finished column offers this, and the handler refuses it
+			     for any other: an open column holds people who are waiting to
+			     hear from us, and clearing it would lose them silently. */}}
+			{{if and .Stage.Closed .Candidates $edit}}
+			<form method="post" action="/kandidater/rensa" class="inline lane-clear"
+			      data-confirm="{{t "pipeline.clear.confirm" (len .Candidates) .Name}}">
+				<input type="hidden" name="steg" value="{{.Stage.ID}}">
+				<button type="submit" class="link-button quiet-danger">{{t "pipeline.clear"}}</button>
+			</form>
+			{{end}}
 		</header>
 
-		<ul class="lane-cards" data-drop>
+		<ul class="lane-cards" {{if $edit}}data-drop{{end}}>
 			{{range .Candidates}}
 			{{$c := .Candidate}}
-			<li class="card-c" draggable="true" data-card="{{$c.ID}}">
+			<li class="card-c" {{if $edit}}draggable="true"{{end}} data-card="{{$c.ID}}">
 				<div class="card-top">
-					<span class="grip" aria-hidden="true">⠿</span>
-					<strong data-edit="fornamn" data-id="{{$c.ID}}" data-label="{{t "form.firstname"}}">{{with $c.FirstName}}{{.}}{{else}}—{{end}}</strong>
-					<strong data-edit="efternamn" data-id="{{$c.ID}}" data-label="{{t "form.lastname"}}">{{with $c.LastName}}{{.}}{{else}}—{{end}}</strong>
+					{{if $edit}}<span class="grip" aria-hidden="true">⠿</span>{{end}}
+					{{/* The click-to-edit hooks come off entirely for a reader.
+					     A field that opens an input and then saves nothing is
+					     worse than plain text. */}}
+					<strong {{if $edit}}data-edit="fornamn" data-id="{{$c.ID}}" data-label="{{t "form.firstname"}}"{{end}}>{{with $c.FirstName}}{{.}}{{else}}—{{end}}</strong>
+					<strong {{if $edit}}data-edit="efternamn" data-id="{{$c.ID}}" data-label="{{t "form.lastname"}}"{{end}}>{{with $c.LastName}}{{.}}{{else}}—{{end}}</strong>
 					{{if .Known}}<span class="chip chip-van" title="{{t "pipeline.already" .Member.Name}}">{{t "pipeline.ismember"}}</span>{{end}}
 				</div>
 
 				<dl class="card-fields">
 					<div><dt>{{t "pipeline.apartment"}}</dt>
-						<dd data-edit="lagenhet" data-id="{{$c.ID}}">{{with $c.Apartment}}{{.}}{{else}}—{{end}}</dd></div>
+						<dd {{if $edit}}data-edit="lagenhet" data-id="{{$c.ID}}"{{end}}>{{with $c.Apartment}}{{.}}{{else}}—{{end}}</dd></div>
 					<div><dt>{{t "pipeline.interview"}}</dt>
-						<dd data-edit="intervju" data-id="{{$c.ID}}" data-type="date"
-						    data-raw="{{if $c.InterviewOn.Valid}}{{isoDate (local $c.InterviewOn.Time)}}{{end}}">{{if $c.InterviewOn.Valid}}{{dateShort (local $c.InterviewOn.Time)}}{{else}}—{{end}}</dd></div>
+						<dd {{if $edit}}data-edit="intervju" data-id="{{$c.ID}}" data-type="date"
+						    data-raw="{{if $c.InterviewOn.Valid}}{{isoDate (local $c.InterviewOn.Time)}}{{end}}"{{end}}>{{if $c.InterviewOn.Valid}}{{dateShort (local $c.InterviewOn.Time)}}{{else}}—{{end}}</dd></div>
 					<div><dt>{{t "pipeline.responsible"}}</dt>
-						<dd data-edit="ansvarig" data-id="{{$c.ID}}">{{with $c.Responsible}}{{.}}{{else}}—{{end}}</dd></div>
+						<dd {{if $edit}}data-edit="ansvarig" data-id="{{$c.ID}}"{{end}}>{{with $c.Responsible}}{{.}}{{else}}—{{end}}</dd></div>
 					<div><dt>{{t "form.email"}}</dt>
-						<dd data-edit="epost" data-id="{{$c.ID}}" data-type="email">{{with $c.Email}}{{.}}{{else}}—{{end}}</dd></div>
+						<dd {{if $edit}}data-edit="epost" data-id="{{$c.ID}}" data-type="email"{{end}}>{{with $c.Email}}{{.}}{{else}}—{{end}}</dd></div>
 					<div><dt>{{t "form.phone"}}</dt>
-						<dd data-edit="telefon" data-id="{{$c.ID}}" data-type="tel">{{with $c.Phone}}{{.}}{{else}}—{{end}}</dd></div>
+						<dd {{if $edit}}data-edit="telefon" data-id="{{$c.ID}}" data-type="tel"{{end}}>{{with $c.Phone}}{{.}}{{else}}—{{end}}</dd></div>
 					<div><dt>{{t "form.note"}}</dt>
-						<dd data-edit="anteckning" data-id="{{$c.ID}}">{{with $c.Note}}{{.}}{{else}}—{{end}}</dd></div>
+						<dd {{if $edit}}data-edit="anteckning" data-id="{{$c.ID}}"{{end}}>{{with $c.Note}}{{.}}{{else}}—{{end}}</dd></div>
 				</dl>
 
 				{{with $c.Message}}<p class="card-said">{{.}}</p>{{end}}
 
+				{{if $edit}}
 				<footer class="card-foot">
 					{{/* Without JavaScript this is how a card moves, and with
 					     it the same control still works — dragging is the
@@ -71,7 +94,21 @@
 					{{else if .Known}}
 					<a class="quiet-link small" href="/medlem/{{.Member.ID}}">{{t "applications.already.see"}}</a>
 					{{end}}
+
+					{{/* Throwing a card away is the team's own tidying: a
+					     duplicate from somebody pressing the button twice, a
+					     row typed in by mistake. It never reaches the
+					     register, which the confirmation says out loud. */}}
+					<form method="post" action="/kandidater/{{$c.ID}}/ta-bort" class="inline card-delete"
+					      data-confirm="{{t "pipeline.delete.confirm" $c.Name}}">
+						<button type="submit" class="link-button quiet-danger">{{t "pipeline.delete"}}</button>
+					</form>
 				</footer>
+				{{else if .Known}}
+				<footer class="card-foot">
+					<a class="quiet-link small" href="/medlem/{{.Member.ID}}">{{t "applications.already.see"}}</a>
+				</footer>
+				{{end}}
 			</li>
 			{{end}}
 		</ul>
@@ -80,10 +117,12 @@
 </div>
 
 <p class="hint board-hint">
-	{{t "pipeline.howto"}}
+	{{if $edit}}{{t "pipeline.howto"}}{{else}}{{t "pipeline.readonly.why"}}{{end}}
 	· {{t "pipeline.publicform"}} <a href="/bli-medlem">{{.Data.JoinURL}}</a>
+	{{if $edit}}<br>{{t "pipeline.clear.why"}}{{end}}
 </p>
 
+{{if $edit}}
 {{/* The dialog the add button opens. It holds the same fields as the page at
      /kandidater/ny and posts to the same place. */}}
 <dialog id="ny-kandidat" class="sheet">
@@ -92,5 +131,6 @@
 	<p class="muted">{{t "pipeline.add.lede"}}</p>
 	{{template "candidatefields" dict "Stages" .Data.Stages "Kinds" .Data.Kinds "Entry" "" "Lang" .Lang}}
 </dialog>
+{{end}}
 {{end}}
 {{template "base" .}}

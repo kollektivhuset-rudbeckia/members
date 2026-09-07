@@ -85,6 +85,16 @@ const (
 	// business and the board's, and nobody else's; the cashier has no reason
 	// to read it and every reason not to have to.
 	PermPipeline Permission = "pipeline"
+	// PermPipelineEdit works the candidate board: moves cards between
+	// columns, edits them, welcomes somebody, throws a card away.
+	//
+	// Seeing the board and working it are deliberately separate. The
+	// interview team runs the pipeline — it is their process, their notes and
+	// their judgement about who is where — and the board looking over their
+	// shoulder is welcome, whereas the board quietly moving somebody out of
+	// "Bokad intervju" is not. Nobody should be able to change a column that
+	// somebody else is answerable for.
+	PermPipelineEdit Permission = "pipeline.edit"
 )
 
 // Access is the permission matrix, resolved once at startup so that a page, a
@@ -100,7 +110,8 @@ const (
 //	fee paid or not    ✗         ✓          ✗ (see PaymentRoles)
 //	decide proposals   ✗         ✗          ✓
 //	sync by hand       ✗         ✗          ✓
-//	the candidates     ✓         ✗          ✓
+//	see the candidates ✓         ✗          ✓
+//	work the board     ✓         ✗          ✗
 type Access struct {
 	// PaymentRoles are the roles that may touch a payment. The house asked
 	// for this to be the cashier alone — they are the one with the bank
@@ -123,6 +134,8 @@ func (a Access) May(r Role, p Permission) bool {
 		return r == RoleBoard || r == RoleCashier
 	case PermPipeline:
 		return r == RoleIntake || r == RoleBoard
+	case PermPipelineEdit:
+		return r == RoleIntake
 	case PermDelete, PermApprove, PermSync:
 		return r == RoleBoard
 	case PermPropose:

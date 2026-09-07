@@ -99,6 +99,79 @@ func (s *Store) UpdateCandidate(ctx context.Context, c Candidate) error {
 	return nil
 }
 
+// DeleteCandidate takes one card off the board for good.
+//
+// Unlike removing a member this needs nobody's approval, because it is not
+// the same kind of act. A card is the interview team's own note about
+// somebody the association has not yet agreed anything with, and the
+// register — the thing the association is actually accountable for — is a
+// different table that this statement cannot reach. Somebody who was
+// welcomed stays a member after their card is gone.
+func (s *Store) DeleteCandidate(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM candidates WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ClearCandidateStage empties one stage and returns the cards it removed.
+//
+// It reads the rows before deleting them, and returns them, rather than
+// reporting a count afterwards. "12 cards were removed" is not something
+// anybody can check a month later; the names are the only part of a deleted
+// card still worth having, and the caller writes them into the audit trail.
+//
+// Whether a stage may be cleared at all is not decided here — that is the
+// caller's business, and it turns on the stage being closed.
+func (s *Store) ClearCandidateStage(ctx context.Context, stage string,
+	loc *time.Location) ([]Candidate, error) {
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.QueryContext(ctx,
+		`SELECT `+candidateCols+` FROM candidates WHERE stage = ? ORDER BY created_at`, stage)
+	if err != nil {
+		return nil, err
+	}
+	var gone []Candidate
+	for rows.Next() {
+		c, err := scanCandidate(rows, loc)
+		if err != nil {
+			rows.Close()
+			return nil, err
+		}
+		gone = append(gone, c)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close()
+
+	if len(gone) == 0 {
+		return nil, tx.Commit()
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM candidates WHERE stage = ?`, stage); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return gone, nil
+}
+
 // Candidate returns one by id.
 func (s *Store) Candidate(ctx context.Context, id string, loc *time.Location) (Candidate, error) {
 	row := s.db.QueryRowContext(ctx, `SELECT `+candidateCols+` FROM candidates WHERE id = ?`, id)

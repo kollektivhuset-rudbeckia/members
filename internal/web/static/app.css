@@ -803,6 +803,12 @@ textarea:hover { border-color: var(--base-300); }
 }
 .move-form select { min-height: 0; padding: .15rem 1.6rem .15rem .35rem; font-size: .78rem; }
 .card-foot .link-button { font-size: .8rem; }
+/* Deleting is offered quietly: it is ordinary tidying for the team that owns
+   the board, not a warning, so it stays a plain link until you reach for it. */
+.quiet-danger { color: var(--text-faint); }
+.quiet-danger:hover { color: var(--danger-text); }
+.lane-clear { margin-left: auto; }
+.lane-clear .link-button { font-size: .78rem; }
 .board-hint { margin-bottom: 2rem; }
 
 /* The add form, over the board rather than instead of it. */

@@ -244,6 +244,22 @@ släpps in — oavsett Google-domän.
 | Ta ställning till förslag | – | – | ✓ |
 | Synkronisera för hand | – | – | ✓ |
 | Läsa loggen | – | – | ✓ |
+| Se kandidattavlan | ✓ | – | ✓ |
+| Arbeta i kandidattavlan | ✓ | – | – |
+
+**Kandidattavlan är intervjugruppens.** Att se den och att arbeta i den är
+två olika rättigheter. Processen, anteckningarna och bedömningen av vem som
+står var är `ny@`s, och styrelsen är välkommen att titta — men att någon annan
+flyttar en person ut ur *Bokad intervju* är just den förvirring uppdelningen
+finns för att förhindra. Kassören har ingen anledning att läsa den alls: den
+innehåller vad folk berättat om sig själva innan föreningen sagt ja till
+något.
+
+**Att rensa en spalt går bara på *Välkomnade* och *Tackat nej*.** De är
+historik, och korten växer annars i all evighet. En öppen spalt kan inte
+rensas, och det avgörs i koden och inte bara genom att knappen saknas — där
+står människor som väntar på svar från oss. Att ta bort ett kort rör aldrig
+medlemsregistret: den som är välkomnad förblir medlem när kortet är borta.
 
 **Att lägga till är fritt för alla.** Det är hela poängen: en medlem skrivs in
 i samma stund hen visar intresse och hamnar i sin Google-grupp inom en minut,

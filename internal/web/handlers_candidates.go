@@ -1,9 +1,11 @@
 package web
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/kollektivhuset-rudbeckia/members/internal/auth"
@@ -397,6 +399,114 @@ func (s *Server) handleWelcomeCandidate(w http.ResponseWriter, r *http.Request, 
 	s.flash(w, "ok", "flash.welcomed", m.Name())
 	s.log.Info("a candidate became a member", "id", m.ID, "email", m.Email, "by", v.Session.Email)
 	http.Redirect(w, r, "/medlem/"+m.ID, http.StatusSeeOther)
+}
+
+// handleDeleteCandidate takes one card off the board.
+//
+// No approval queue, unlike removing a member. A card is a working note about
+// somebody the association has not agreed anything with yet, and the team that
+// wrote it down is the team that should be able to throw it away — a duplicate
+// from someone pressing the button twice, or a row typed in by mistake, is
+// theirs to tidy. What it does not do is touch the register: somebody who was
+// welcomed is a member, and stays one with their card gone.
+func (s *Server) handleDeleteCandidate(w http.ResponseWriter, r *http.Request, v *view) {
+	c, ok := s.candidate(w, r, v)
+	if !ok {
+		return
+	}
+	if err := s.store.DeleteCandidate(r.Context(), c.ID); err != nil {
+		s.log.Error("could not delete a candidate", "err", err)
+		s.errorPage(w, r, http.StatusInternalServerError, "error.nowrite", "error.nowrite.how")
+		return
+	}
+	s.auditCandidate(r.Context(), v, "candidate.deleted", c, stageName(s.cfg, c, v))
+	s.log.Info("a candidate card was deleted",
+		"id", c.ID, "name", c.Name(), "stage", c.Stage, "by", v.Session.Email)
+	s.flash(w, "ok", "flash.candidate.deleted", c.Name())
+	http.Redirect(w, r, "/kandidater", http.StatusSeeOther)
+}
+
+// handleClearStage empties one finished column.
+//
+// Only a closed stage may be cleared, and that is checked here rather than
+// only hidden in the page. Welcomed and declined are history: the cards have
+// done their work and the column grows forever otherwise. An open stage is
+// the opposite — it holds people who are waiting to hear from us, and
+// somebody who sent the form and heard nothing is the worst thing this
+// register can do to a person. A hand-made request asking to empty "Nya" is
+// refused rather than obeyed.
+func (s *Server) handleClearStage(w http.ResponseWriter, r *http.Request, v *view) {
+	if err := r.ParseForm(); err != nil {
+		s.errorPage(w, r, http.StatusBadRequest, "error.form", "error.form.detail")
+		return
+	}
+	id := strings.TrimSpace(r.FormValue("steg"))
+	st, known := s.cfg.Pipeline.Stage(id)
+	if !known {
+		s.flash(w, "error", "flash.candidate.nostage")
+		http.Redirect(w, r, "/kandidater", http.StatusSeeOther)
+		return
+	}
+	if !st.Closed {
+		s.flash(w, "error", "flash.candidate.stillopen", st.NameFor(string(v.Lang)))
+		http.Redirect(w, r, "/kandidater", http.StatusSeeOther)
+		return
+	}
+
+	gone, err := s.store.ClearCandidateStage(r.Context(), st.ID, v.Loc)
+	if err != nil {
+		s.log.Error("could not clear a stage", "stage", st.ID, "err", err)
+		s.errorPage(w, r, http.StatusInternalServerError, "error.nowrite", "error.nowrite.how")
+		return
+	}
+	name := st.NameFor(string(v.Lang))
+	if len(gone) == 0 {
+		s.flash(w, "warn", "flash.candidate.cleared.none", name)
+		http.Redirect(w, r, "/kandidater", http.StatusSeeOther)
+		return
+	}
+
+	// One line per card rather than one line saying "12 cards". A month later
+	// the only question anybody asks of this trail is who was on it.
+	for _, c := range gone {
+		s.auditCandidate(r.Context(), v, "candidate.deleted", c, name)
+	}
+	s.log.Info("a finished column was cleared",
+		"stage", st.ID, "cards", len(gone), "by", v.Session.Email)
+	s.flash(w, "ok", "flash.candidate.cleared", strconv.Itoa(len(gone)), name)
+	http.Redirect(w, r, "/kandidater", http.StatusSeeOther)
+}
+
+// auditCandidate writes a deleted card into the trail.
+//
+// The member trail is the right place for it even though a candidate is not a
+// member: it is the one page the board already reads to find out what happened
+// to the register, and a card that existed and now does not belongs there. The
+// row carries the name and address as text, and no member id unless the card
+// had reached one, so the log renders it as a plain line rather than a link to
+// somebody who may never have existed in the register.
+func (s *Server) auditCandidate(ctx context.Context, v *view, action string,
+	c store.Candidate, detail string) {
+
+	subject := c.Name()
+	if c.Email != "" {
+		subject += " <" + c.Email + ">"
+	}
+	err := s.store.Log(ctx, store.Entry{
+		At: s.now(), Actor: v.Session.Email, Role: string(v.Role), Action: action,
+		MemberID: c.MemberID, Subject: subject, Detail: detail,
+	})
+	if err != nil {
+		s.log.Error("could not write the audit trail", "action", action, "err", err)
+	}
+}
+
+// stageName is the column a card was standing in, for the trail.
+func stageName(cfg *config.Config, c store.Candidate, v *view) string {
+	if st, known := cfg.Pipeline.Stage(c.Stage); known {
+		return st.NameFor(string(v.Lang))
+	}
+	return c.Stage
 }
 
 // welcomedStage is the closed stage somebody lands in once they are a member.
