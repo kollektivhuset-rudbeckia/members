@@ -175,11 +175,12 @@ misslyckas rullas inte ut alls.
 
 ### Hur den kommer in
 
-Nyckeln i `QUEBEC_SSH_KEY` når kontot `deploy` på quebec, och det kontot kan
-göra exakt en sak. `authorized_keys` binder nyckeln till ett *forced command*:
+Nyckeln i `QUEBEC_SSH_KEY` når kontot `deploy` på quebec, och med den nyckeln
+kan kontot göra exakt en sak. `authorized_keys` binder nyckeln till ett
+*forced command*:
 
 ```
-command="/usr/local/bin/deploy-members",no-agent-forwarding,no-port-forwarding,no-pty,...
+command="/usr/local/bin/deploy",no-agent-forwarding,no-port-forwarding,no-pty,...
 ```
 
 Vad den andra änden än ber om kör ssh det skriptet. Inget skal, ingen scp,
@@ -187,6 +188,21 @@ ingen vidarebefordran. Kontot har inget lösenord och ligger inte i `sudo`.
 
 Skriptet ägs av root och går inte att skriva till från `deploy`, så nyckeln
 kan inte heller peka om sig själv.
+
+Ett forced command hänger på *nyckeln*, inte på repot. Eftersom nyckeln är
+gemensam för husets tre tjänster kan den alltså inte i sig säga vilken som ska
+startas om, och därför skickar workflowet namnet som ssh-kommando — `ssh
+"$USER@$HOST" members`. Det körs inte som ett kommando: `sshd` lägger strängen
+i `SSH_ORIGINAL_COMMAND` och kör skriptet ändå, och skriptet matchar den mot
+en fast lista där varje gren sätter katalog, container och port från
+literaler. Allt annat avvisas i stället för att gissas på.
+
+Baksidan av en gemensam nyckel är värd att säga rakt ut: varje repo i
+organisationen som kommer åt hemligheten kan rulla ut vilken som helst av de
+tre tjänsterna. Vill man inte det, är det nyckeln som ska delas upp — en per
+tjänst, var och en bunden till sitt eget skript. Skriptet står i sin helhet i
+[bokningens motsvarande
+sida](https://github.com/kollektivhuset-rudbeckia/booking/blob/main/docs/deploy.md#skriptet-på-servern).
 
 ### Vad som skickas
 
@@ -206,11 +222,23 @@ det som gör att ett arkiv inte kan skriva var det vill. `.env` och
 
 Servern har alltså ingen GitHub-token och ingen väg till GitHub alls.
 
-### Hemligheter i repot
+### Hemligheter i organisationen
+
+De fyra ligger på **organisationen** och inte på repot, så att nästa app som
+ska rullas ut till quebec kan använda samma uppsättning utan att någon behöver
+klistra in en nyckel igen. Synligheten är *all repositories*.
+
+Ett secret på repot **skuggar** ett med samma namn på organisationen. Det är
+tyst — utrullningen blir grön och använder repots värde ändå. Ligger det ett
+kvar på ett repo är det därför värt att ta bort det, inte att låta ligga:
+
+```bash
+gh secret list --repo kollektivhuset-rudbeckia/<repo>
+```
 
 | Secret | Vad |
 |---|---|
-| `QUEBEC_SSH_KEY` | privata halvan av nyckeln som kör `deploy-members` |
+| `QUEBEC_SSH_KEY` | privata halvan av nyckeln som kör `/usr/local/bin/deploy` |
 | `QUEBEC_HOST` | `ssh.rudbeckia.nu` |
 | `QUEBEC_USER` | `deploy` |
 | `QUEBEC_KNOWN_HOSTS` | värdnyckeln, så att utrullningen inte litar på vad som helst |

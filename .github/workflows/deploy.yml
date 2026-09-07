@@ -45,7 +45,7 @@ jobs:
           [ -n "$KEY" ]  || missing="$missing QUEBEC_SSH_KEY"
           [ -n "$HOST" ] || missing="$missing QUEBEC_HOST"
           if [ -n "$missing" ]; then
-            echo "::error::missing repository secrets:$missing"
+            echo "::error::missing deploy secrets:$missing"
             exit 1
           fi
 
@@ -65,10 +65,15 @@ jobs:
           # The far end runs a forced command whatever we ask for, so this is
           # a pipe rather than a copy: the files the container reads from
           # disk, and the commit they came from.
+          #
+          # The word after the host is not a command either. One key is shared
+          # by every repository in the organisation, so the key cannot say
+          # which service to restart; the forced command reads this out of
+          # SSH_ORIGINAL_COMMAND and matches it against a fixed list.
           echo "${{ github.event.workflow_run.head_sha || github.sha }}" > DEPLOYED_SHA
           tar -czf - config.yaml docker-compose.yml DEPLOYED_SHA \
             | ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes \
-                  -o ConnectTimeout=20 "$USER@$HOST" 2>&1 | tee deploy.log
+                  -o ConnectTimeout=20 "$USER@$HOST" members 2>&1 | tee deploy.log
 
       - name: Summary
         if: always()
