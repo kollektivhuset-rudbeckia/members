@@ -4,6 +4,9 @@
 *.db-shm
 *.db-wal
 
+# Database dumps
+*.tgz
+
 # Local secrets: the .env and the service account key
 .env
 *.sa.json
