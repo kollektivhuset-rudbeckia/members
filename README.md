@@ -459,6 +459,8 @@ Allt hemligt sätts som miljövariabler, aldrig i `config.yaml`. Se
 | `DB_PATH` | `/data/members.db` | Var registret ligger |
 | `LISTEN_ADDR` | `:8080` | Adress att lyssna på |
 | `TRUST_PROXY` | `true` | Läs klientens IP ur `X-Forwarded-For` |
+| `GROUP_KEEP_BO` | tom | Extra adresser som aldrig rensas ur `bomedlemmar@`, kommaseparerat |
+| `GROUP_KEEP_VAN` | tom | Samma för `friends@` |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` eller `error` |
 | `DEMO` | `false` | Demoläge: påhittade medlemmar, roller på begäran, ingen Google. **Aldrig skarpt** |
 
@@ -479,6 +481,18 @@ Filen läses vid start, och en felstavad nyckel avvisas i stället för att
 ignoreras — annars skulle en avgift man tror att man satt aldrig ha lästs.
 
 ---
+
+**Varför `GROUP_KEEP_*` finns.** En `keep`-lista i `config.yaml` är två olika
+saker blandade. Föreningens egna adresser — `admin@`, `kontakt@`,
+`valberedningen@` — står på hemsidan ändå och hör hemma i filen, där man kan
+se varför de är skyddade. Resten är privatadresser till personer som ligger i
+en grupp utan att stå i registret, och det här repot är publikt. De sätts i
+`GROUP_KEEP_BO` i `.env` på servern i stället och läggs till listan i filen när
+registret startar.
+
+Läsningen sker när konfigurationen tolkas, inte via ett anrop från `main`, så
+att ingen ingång kan skrivas som glömmer den. Att missa den skulle inte smälla
+högt: det skulle tysta korta listan över dem en synk inte får röra.
 
 ## Två språk
 

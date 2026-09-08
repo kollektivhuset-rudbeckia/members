@@ -53,7 +53,7 @@ WELCOMED
       Apartment:         1401
       Email:             mira.lindqvist@example.test
       Interview booked:  2023-11-28
-      Responsible:       Tati
+      Responsible:       Nils
 
 
 REJECTED
@@ -81,21 +81,21 @@ func TestReadingTheExportedBoard(t *testing.T) {
 		}
 	}
 
-	acki := rows[0]
-	if acki.Name != "Ove Bergkvist" {
-		t.Errorf("name: got %q", acki.Name)
+	first := rows[0]
+	if first.Name != "Ove Bergkvist" {
+		t.Errorf("name: got %q", first.Name)
 	}
-	if acki.Email != "ove.bergkvist@example.test" {
-		t.Errorf("email: got %q", acki.Email)
+	if first.Email != "ove.bergkvist@example.test" {
+		t.Errorf("email: got %q", first.Email)
 	}
-	if acki.Apartment != "1401" {
-		t.Errorf("apartment: got %q", acki.Apartment)
+	if first.Apartment != "1401" {
+		t.Errorf("apartment: got %q", first.Apartment)
 	}
-	if acki.Interview != "2025-09-30" {
-		t.Errorf("interview: got %q", acki.Interview)
+	if first.Interview != "2025-09-30" {
+		t.Errorf("interview: got %q", first.Interview)
 	}
-	if acki.Stage != "interview" {
-		t.Errorf("stage: got %q, want interview", acki.Stage)
+	if first.Stage != "interview" {
+		t.Errorf("stage: got %q, want interview", first.Stage)
 	}
 
 	// A candidate with no address at all is still on the board, and the

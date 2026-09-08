@@ -73,20 +73,16 @@ groups:
     # trist eftermiddag. Föreningens egna konton och den som Google kallar
     # ägare eller manager skyddas automatiskt och behöver inte stå med.
     #
-    # Matlagsledarna nedan är personer som funnits i gruppen utan att stå i
-    # kontaktregistret. Skriv in dem som medlemmar när ni vet vilka de är —
-    # då kan raderna tas bort härifrån.
+    # Bara föreningens egna adresser står här. Enskilda personers adresser
+    # hör inte hemma i en fil som ligger publikt — de sätts i GROUP_KEEP_BO
+    # i .env på servern och läggs till den här listan när registret startar.
+    # Matlagsledarna som ligger där i dag är personer som funnits i gruppen
+    # utan att stå i kontaktregistret. Skriv in dem som medlemmar när ni vet
+    # vilka de är, och töm sedan GROUP_KEEP_BO.
     keep:
       - admin@rudbeckia.nu
       - kontakt@rudbeckia.nu
       - valberedningen@rudbeckia.nu
-      - nagon@example.com
-      - redacted@example.invalid
-      - redacted@example.invalid
-      - redacted@example.invalid
-      - redacted@example.invalid
-      - redacted@example.invalid
-      - redacted@example.invalid
 
   - kind: van
     name: Vänmedlemmar

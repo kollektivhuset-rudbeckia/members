@@ -24,6 +24,13 @@ services:
       ACCOUNT_BOARD: ${ACCOUNT_BOARD:-styrelsen@rudbeckia.nu}
       PAYMENT_ROLES: ${PAYMENT_ROLES:-cashier}
 
+      # --- Adresser som aldrig får rensas ur en grupp ------------------------
+      # Föreningens egna adresser står i config.yaml. Enskilda personers hör
+      # inte hemma i en fil som ligger publikt, så de sätts här i stället och
+      # läggs till listan i filen.
+      GROUP_KEEP_BO: ${GROUP_KEEP_BO:-}
+      GROUP_KEEP_VAN: ${GROUP_KEEP_VAN:-}
+
       # --- Frivilligt ------------------------------------------------------
       SESSION_SECRET: ${SESSION_SECRET:-}
       SESSION_HOURS: ${SESSION_HOURS:-12}

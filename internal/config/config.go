@@ -350,6 +350,48 @@ func (p Pipeline) Open() []Stage {
 	return out
 }
 
+// keepFromEnv reads the addresses that must survive a prune but have no
+// business in a configuration file.
+//
+// A keep list is a mixture of two different things. Some entries are the
+// association's own mailboxes — admin@, kontakt@, valberedningen@ — which are
+// published on the website anyway and belong in the file where anybody can see
+// why they are protected. The rest are private addresses of real people who
+// happen to be in a group without being in the register, and this repository
+// is public. Those go in GROUP_KEEP_BO or GROUP_KEEP_VAN, alongside the other
+// deployment-specific settings, and the file keeps only the part that explains
+// itself.
+//
+// It is read here rather than through a call from main, so that no entry point
+// can be written that forgets it. Getting this wrong does not fail loudly: it
+// quietly shortens the list of people a sync must not touch.
+func keepFromEnv(k Kind) []string {
+	raw := os.Getenv("GROUP_KEEP_" + strings.ToUpper(string(k)))
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	return strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == ';' || r == ' ' || r == '\t' || r == '\n'
+	})
+}
+
+// cleanAddresses lowercases, trims and de-duplicates a list of addresses,
+// dropping the empties, so that a keep list assembled from two sources reads
+// as one.
+func cleanAddresses(in []string) []string {
+	seen := make(map[string]bool, len(in))
+	out := make([]string, 0, len(in))
+	for _, a := range in {
+		a = strings.ToLower(strings.TrimSpace(a))
+		if a == "" || seen[a] {
+			continue
+		}
+		seen[a] = true
+		out = append(out, a)
+	}
+	return out
+}
+
 // Sheet is the spreadsheet the cashiers calculate in. The registry owns the
 // tab named here and overwrites it on every run, so nobody should type into
 // it — put formulas on a second tab that reads from this one.
@@ -573,9 +615,7 @@ func (c *Config) normalise() error {
 		if g.Name == "" {
 			g.Name = g.Email
 		}
-		for j, k := range g.Keep {
-			g.Keep[j] = strings.ToLower(strings.TrimSpace(k))
-		}
+		g.Keep = cleanAddresses(append(g.Keep, keepFromEnv(g.Kind)...))
 	}
 
 	for i, a := range c.Contacts.Accounts {
