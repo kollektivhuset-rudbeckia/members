@@ -31,6 +31,25 @@
 		});
 	});
 
+	// --- Reveal the "something else" box only when it is wanted -------------
+	// The box is in the page whether or not this runs: hiding it by default
+	// would leave somebody without JavaScript told to fill in a field they
+	// cannot see. All this does is collapse it until it is the answer.
+	(function reasonOther() {
+		var reveal = document.querySelector('[data-reveals]');
+		if (!reveal) { return; }
+		var box = document.querySelector(reveal.getAttribute('data-reveals'));
+		if (!box) { return; }
+		var group = document.getElementsByName(reveal.name);
+		var sync = function () {
+			box.hidden = !reveal.checked;
+		};
+		for (var i = 0; i < group.length; i++) {
+			group[i].addEventListener('change', sync);
+		}
+		sync();
+	})();
+
 	// --- Filter the table as you type ---------------------------------------
 	// The same box submits to the server without JavaScript and gets the same
 	// answer. This only saves the round trip, which for a register of a few

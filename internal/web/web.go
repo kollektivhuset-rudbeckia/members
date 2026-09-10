@@ -52,6 +52,13 @@ type Server struct {
 	// site has to ask whether Mattermost exists.
 	chat *mattermost.Client
 
+	// joinThrottle slows a burst of public form submissions down before it
+	// reaches the database. It belongs to the server rather than the package:
+	// a limiter shared by every Server in the process is state that leaks
+	// between them, which is wrong in a test and would be wrong in a binary
+	// that ever ran two.
+	joinThrottle *joinLimiter
+
 	// tpl holds one parsed set per language. The language is baked into the
 	// template functions, so a page says {{t "key"}} and gets the right words
 	// without every call site passing a language around.
@@ -84,7 +91,7 @@ func New(cfg *config.Config, rt config.Runtime, st *store.Store, guard *auth.Gua
 		chat = mattermost.New("", "", log)
 	}
 	s := &Server{cfg: cfg, rt: rt, store: st, guard: guard, sync: syncer,
-		chat: chat, log: log, now: time.Now}
+		chat: chat, log: log, now: time.Now, joinThrottle: newJoinThrottle()}
 	var err error
 	if s.assets, err = hashAssets(); err != nil {
 		return nil, err

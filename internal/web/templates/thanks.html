@@ -69,7 +69,7 @@
 	<dl class="facts-list">
 		<div><dt>{{t "form.email"}}</dt><dd>{{$a.Email}}</dd></div>
 		{{with $a.Phone}}<div><dt>{{t "form.phone"}}</dt><dd>{{.}}</dd></div>{{end}}
-		<div><dt>{{t "join.wanting"}}</dt><dd>{{t (printf "kind.%s" $a.Kind)}}</dd></div>
+		{{with $d.Reason}}<div><dt>{{t "join.why.short"}}</dt><dd>{{.}}</dd></div>{{end}}
 		{{with $a.Message}}<div><dt>{{t "join.message"}}</dt><dd>{{.}}</dd></div>{{end}}
 	</dl>
 	<p class="hint">{{t "join.thanks.wrong" $d.Contact}}</p>

@@ -77,7 +77,9 @@ func (s *Server) announceInterest(c store.Candidate) {
 	row(&m, "Namn", nameOrUnknown(c.Name()))
 	row(&m, "E-post", c.Email)
 	row(&m, "Telefon", c.Phone)
-	row(&m, "Vill bli", s.kindWord(c.Kind))
+	// Why, rather than which membership: everybody who applies becomes a
+	// vänmedlem, so the useful line is what drew them here.
+	row(&m, "Varför", s.reasonWords(c, string(s.defaultLang())))
 	if c.Apartment != "" {
 		row(&m, "Lägenhet", c.Apartment)
 	}

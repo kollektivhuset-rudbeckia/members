@@ -34,9 +34,6 @@ const (
 	applicationWindow = 24 * time.Hour
 )
 
-// joinThrottle slows a burst down before it reaches the database at all.
-var joinThrottle = newJoinThrottle()
-
 type joinLimiter struct {
 	mu    sync.Mutex
 	seen  map[string][]time.Time
@@ -76,28 +73,39 @@ type joinForm struct {
 	LastName  string
 	Email     string
 	Phone     string
-	Kind      string
-	Message   string
-	Errors    map[string]string
+	// Reason is why they want to join, and ReasonNote is what they typed when
+	// none of the set answers fitted. There is deliberately no Kind: the form
+	// used to ask which membership somebody was after, and bomedlem was one
+	// of the answers — which invited people to apply for something nobody
+	// could grant them. Everybody who applies becomes a vänmedlem.
+	Reason     string
+	ReasonNote string
+	Message    string
+	Errors     map[string]string
 }
+
+// Chose reports whether this reason is the one picked, so the form can come
+// back with the person's own answer still selected after an error.
+func (f joinForm) Chose(id string) bool { return f.Reason == id }
 
 func (f joinForm) Bad() bool               { return len(f.Errors) > 0 }
 func (f joinForm) Err(field string) string { return f.Errors[field] }
 
 func readJoinForm(r *http.Request) joinForm {
 	return joinForm{
-		FirstName: strings.TrimSpace(r.FormValue("fornamn")),
-		LastName:  strings.TrimSpace(r.FormValue("efternamn")),
-		Email:     store.Email(r.FormValue("epost")),
-		Phone:     strings.TrimSpace(r.FormValue("telefon")),
-		Kind:      strings.TrimSpace(r.FormValue("typ")),
-		Message:   strings.TrimSpace(r.FormValue("meddelande")),
+		FirstName:  strings.TrimSpace(r.FormValue("fornamn")),
+		LastName:   strings.TrimSpace(r.FormValue("efternamn")),
+		Email:      store.Email(r.FormValue("epost")),
+		Phone:      strings.TrimSpace(r.FormValue("telefon")),
+		Reason:     strings.TrimSpace(r.FormValue("varfor")),
+		ReasonNote: strings.TrimSpace(r.FormValue("varfor_annat")),
+		Message:    strings.TrimSpace(r.FormValue("meddelande")),
 	}
 }
 
 // validate checks the form the way a person would: is there a name, does the
 // address look like one, is the message a message rather than an essay.
-func (f *joinForm) validate() (config.Kind, bool) {
+func (f *joinForm) validate(join config.Join) bool {
 	f.Errors = map[string]string{}
 	if f.FirstName == "" && f.LastName == "" {
 		f.Errors["name"] = "form.err.name"
@@ -108,9 +116,25 @@ func (f *joinForm) validate() (config.Kind, bool) {
 	case !emailShape.MatchString(f.Email):
 		f.Errors["email"] = "form.err.email.shape"
 	}
-	kind, ok := config.ParseKind(f.Kind)
-	if !ok {
-		f.Errors["kind"] = "form.err.kind"
+	// The reason is the point of asking, so it is required — but only from
+	// among the answers the form actually offered, so that a hand-made
+	// request cannot record a reason nobody could have chosen.
+	switch {
+	case f.Reason == "":
+		f.Errors["reason"] = "join.err.reason"
+	case !join.Offers(f.Reason):
+		f.Errors["reason"] = "join.err.reason"
+	case f.Reason == config.ReasonOther && f.ReasonNote == "":
+		// Picking "something else" and saying nothing tells the interview
+		// team less than picking nothing at all would.
+		f.Errors["reason_note"] = "join.err.reason.other"
+	}
+	if len([]rune(f.ReasonNote)) > 500 {
+		f.Errors["reason_note"] = "join.err.long"
+	}
+	if f.Reason != config.ReasonOther {
+		// A note typed before changing one's mind is not an answer.
+		f.ReasonNote = ""
 	}
 	if len([]rune(f.Message)) > 2000 {
 		f.Errors["message"] = "join.err.long"
@@ -123,7 +147,7 @@ func (f *joinForm) validate() (config.Kind, bool) {
 			f.Errors[tooLong.field] = "join.err.long"
 		}
 	}
-	return kind, len(f.Errors) == 0
+	return len(f.Errors) == 0
 }
 
 // publicView builds the shell for a page nobody has signed in to. It is not
@@ -140,23 +164,29 @@ func (s *Server) publicView(r *http.Request, title string) *view {
 }
 
 func (s *Server) handleJoinForm(w http.ResponseWriter, r *http.Request) {
-	s.renderJoin(w, r, joinForm{Kind: string(config.KindVan)}, http.StatusOK)
+	s.renderJoin(w, r, joinForm{}, http.StatusOK)
 }
 
 func (s *Server) renderJoin(w http.ResponseWriter, r *http.Request, f joinForm, status int) {
 	v := s.publicView(r, i18n.T(i18n.FromRequest(r, s.defaultLang()), "join.title"))
 	year := v.Now.Year()
+	// The vänmedlem fee, because that is the membership this page is for.
+	// It read the bomedlem fee before, which happened to be the same number
+	// and would have quietly become wrong the day the house set them apart.
+	fee := s.cfg.Membership.FeeFor(config.KindVan, year)
+	next := s.cfg.Membership.FeeFor(config.KindVan, year+1)
 	v.Data = map[string]any{
-		"Form":  f,
-		"Kinds": s.kindOptions(v.Lang),
-		"Year":  year,
-		"FeeBo": s.cfg.Membership.FeeFor(config.KindBo, year),
+		"Form":    f,
+		"Reasons": s.cfg.Join.Reasons,
+		"Other":   config.ReasonOther,
+		"Year":    year,
+		"Fee":     fee,
 		// What it will be next year, when that has already been decided. A
 		// person deciding whether to join deserves to know the fee is going
 		// up before they find out by being billed for it.
 		"NextYear":   year + 1,
-		"FeeNext":    s.cfg.Membership.FeeFor(config.KindBo, year+1),
-		"FeeChanges": s.cfg.Membership.FeeFor(config.KindBo, year) != s.cfg.Membership.FeeFor(config.KindBo, year+1),
+		"FeeNext":    next,
+		"FeeChanges": fee != next,
 		"Bankgiro":   s.cfg.Membership.Bankgiro,
 		"Swish":      s.cfg.Membership.Swish,
 		"Contact":    s.rt.AccountFor(config.RoleIntake),
@@ -181,13 +211,12 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	f := readJoinForm(r)
-	kind, ok := f.validate()
-	if !ok {
+	if !f.validate(s.cfg.Join) {
 		s.renderJoin(w, r, f, http.StatusUnprocessableEntity)
 		return
 	}
 
-	if !joinThrottle.allow(ip, now) {
+	if !s.joinThrottle.allow(ip, now) {
 		s.log.Warn("too many join forms from one address", "ip", ip)
 		f.Errors = map[string]string{"form": "join.err.toomany"}
 		s.renderJoin(w, r, f, http.StatusTooManyRequests)
@@ -212,7 +241,12 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 	c := store.Candidate{
 		ID: auth.ID(), Token: auth.Token(),
 		FirstName: f.FirstName, LastName: f.LastName, Email: f.Email, Phone: f.Phone,
-		Kind: kind, Message: f.Message,
+		// Always a vänmedlem. Bomedlem follows from moving in, which is a
+		// separate decision on a separate day; "I would like to move in" is
+		// recorded as a reason, which is what it actually is.
+		Kind:    config.KindVan,
+		Message: f.Message,
+		Reason:  f.Reason, ReasonNote: f.ReasonNote,
 		Stage:     s.cfg.Pipeline.EntryStage(),
 		Source:    store.SourceForm,
 		CreatedAt: now, CreatedIP: ip, MovedAt: now,
@@ -222,7 +256,8 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 		s.errorPage(w, r, http.StatusInternalServerError, "error.nowrite", "error.nowrite.how")
 		return
 	}
-	s.log.Info("somebody would like to join", "name", c.Name(), "email", c.Email, "kind", c.Kind)
+	s.log.Info("somebody would like to join", "name", c.Name(), "email", c.Email,
+		"reason", c.Reason)
 	// Tell the interview team now, not at the next sync. Somebody who fills
 	// in this form and hears nothing is the worst thing the register can do
 	// to a person, and a channel message is how a human gets to them today.
@@ -277,6 +312,32 @@ func (s *Server) handleJoinThanks(w http.ResponseWriter, r *http.Request) {
 		"Candidate": a,
 		"Pay":       ways,
 		"Contact":   s.rt.AccountFor(config.RoleIntake),
+		"Reason":    s.reasonWords(a, string(v.Lang)),
 	}
 	s.render(w, r, http.StatusOK, "thanks.html", v)
+}
+
+// reasonWords is why somebody applied, in words, for a page or a chat message.
+//
+// It resolves the stored id through the configuration rather than storing the
+// label, so that renaming a reason renames it everywhere instead of leaving
+// two generations of wording in the register. A candidate recorded before the
+// form asked has no reason and gets no words, which reads as "nobody asked"
+// rather than as a reason nobody chose.
+func (s *Server) reasonWords(c store.Candidate, lang string) string {
+	switch {
+	case c.Reason == "":
+		return ""
+	case c.Reason == config.ReasonOther:
+		if note := strings.TrimSpace(c.ReasonNote); note != "" {
+			return note
+		}
+		return i18n.T(i18n.Lang(lang), "join.why.other")
+	}
+	if r, ok := s.cfg.Join.Reason(c.Reason); ok {
+		return r.NameFor(lang)
+	}
+	// A reason that has since been taken out of the configuration. Show the
+	// id rather than nothing, so the row does not silently empty out.
+	return c.Reason
 }

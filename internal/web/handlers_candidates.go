@@ -35,6 +35,10 @@ type candidateView struct {
 	// separately. Welcoming them twice would make a duplicate.
 	Member store.Member
 	Known  bool
+	// Reason is why they applied, resolved to words through the
+	// configuration, so that renaming a reason renames it on every card
+	// rather than leaving two generations of wording on the board.
+	Reason string
 }
 
 func (s *Server) handleCandidates(w http.ResponseWriter, r *http.Request, v *view) {
@@ -47,7 +51,7 @@ func (s *Server) handleCandidates(w http.ResponseWriter, r *http.Request, v *vie
 
 	byStage := map[string][]candidateView{}
 	for _, c := range list {
-		cv := candidateView{Candidate: c}
+		cv := candidateView{Candidate: c, Reason: s.reasonWords(c, string(v.Lang))}
 		if c.Email != "" {
 			if m, err := s.store.MemberByEmail(r.Context(), c.Email, v.Loc); err == nil {
 				cv.Member, cv.Known = m, true

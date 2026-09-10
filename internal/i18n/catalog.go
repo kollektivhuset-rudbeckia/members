@@ -488,9 +488,20 @@ var catalog = map[string]entry{
 	"join.what.house.body":  {"Arbetsgrupper, fester, odlingen, verkstaden, spelkvällar. Medlemmar är välkomna på det mesta.", "Working groups, parties, the garden, the workshop, game nights. Members are welcome at most of it."},
 	"join.what.more":        {"Mer om huset finns på %s.", "More about the house is at %s."},
 
-	"join.kinds":    {"Två sorters medlemskap", "Two kinds of membership"},
-	"join.kind.bo":  {"Du bor i huset. Alla boende över 18 är bomedlemmar, oavsett kontrakt.", "You live in the house. Everybody living here over 18 is a resident member, whatever their contract."},
-	"join.kind.van": {"Du bor någon annanstans, men är med i matlagen och i det som händer. Det är det här de flesta som söker sig hit börjar med.", "You live somewhere else, but join the cooking teams and what goes on. This is where most people who find their way here start."},
+	"join.kinds":      {"Två sorters medlemskap", "Two kinds of membership"},
+	"join.kind.bo":    {"Det blir du när du flyttar in. Alla boende över 18 är bomedlemmar, oavsett kontrakt — det är inget man söker, utan något man blir.", "That is what you become when you move in. Everybody living here over 18 is a resident member, whatever their contract — it is not something you apply for, it is something you become."},
+	"join.kind.van":   {"Du bor någon annanstans, men är med i matlagen och i det som händer. Det är det här de flesta som söker sig hit börjar med.", "You live somewhere else, but join the cooking teams and what goes on. This is where most people who find their way here start."},
+	"join.kinds.lede": {"Det är vänmedlem du anmäler dig till här. Bomedlem är inget man söker.", "Friend member is what you sign up for here. Resident member is not something you apply for."},
+
+	"join.why":            {"Varför vill du bli vänmedlem?", "Why would you like to be a friend member?"},
+	"join.why.short":      {"Varför", "Why"},
+	"join.why.hint":       {"Välj det som stämmer bäst. Det är inget bindande — det hjälpar oss att veta vad vi ska berätta om.", "Pick whichever fits best. Nothing is binding — it helps us know what to tell you about."},
+	"join.why.other":      {"Något annat", "Something else"},
+	"join.why.other.what": {"Vad är du nyfiken på?", "What are you after?"},
+	"join.why.other.hint": {"Skriv med egna ord", "In your own words"},
+
+	"join.err.reason":       {"Välj ett skäl, så vet vi vad vi ska berätta om.", "Pick a reason, so we know what to tell you about."},
+	"join.err.reason.other": {"Skriv några ord om vad du är nyfiken på.", "Write a few words about what you are after."},
 
 	"join.cost":      {"Vad det kostar", "What it costs"},
 	"join.cost.year": {"per person för %d", "per person for %d"},

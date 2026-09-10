@@ -33,6 +33,13 @@ type Candidate struct {
 	Kind      config.Kind
 	// Message is what they wrote about themselves.
 	Message string
+	// Reason is why they want to join: one of the ids in config.Join, or
+	// config.ReasonOther. Empty on candidates recorded before the form asked,
+	// which reads as "nobody asked" rather than as a reason nobody chose.
+	Reason string
+	// ReasonNote is what they typed when no set answer fitted. It is only
+	// filled in alongside config.ReasonOther.
+	ReasonNote string
 	// Stage is where they have reached, one of the ids in config.Pipeline.
 	Stage string
 	// Responsible is whoever on the team is looking after them, by name.
@@ -61,16 +68,17 @@ const (
 )
 
 const candidateCols = `id, token, first_name, last_name, email, phone, apartment, kind,
-	message, stage, responsible, interview_on, note, source, member_id,
+	message, reason, reason_note, stage, responsible, interview_on, note, source, member_id,
 	created_at, created_ip, moved_at, moved_by`
 
 // CreateCandidate writes a new one.
 func (s *Store) CreateCandidate(ctx context.Context, c Candidate) error {
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO candidates (`+candidateCols+`)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.ID, c.Token, c.FirstName, c.LastName, Email(c.Email), c.Phone, c.Apartment,
-		string(c.Kind), c.Message, c.Stage, c.Responsible, dayOrNil(c.InterviewOn),
+		string(c.Kind), c.Message, c.Reason, c.ReasonNote,
+		c.Stage, c.Responsible, dayOrNil(c.InterviewOn),
 		c.Note, c.Source, c.MemberID,
 		utc(c.CreatedAt), c.CreatedIP, utc(c.MovedAt), c.MovedBy)
 	return err
@@ -80,11 +88,12 @@ func (s *Store) CreateCandidate(ctx context.Context, c Candidate) error {
 func (s *Store) UpdateCandidate(ctx context.Context, c Candidate) error {
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE candidates SET first_name=?, last_name=?, email=?, phone=?, apartment=?,
-			kind=?, message=?, stage=?, responsible=?, interview_on=?, note=?,
-			member_id=?, moved_at=?, moved_by=?
+			kind=?, message=?, reason=?, reason_note=?, stage=?, responsible=?,
+			interview_on=?, note=?, member_id=?, moved_at=?, moved_by=?
 		WHERE id=?`,
 		c.FirstName, c.LastName, Email(c.Email), c.Phone, c.Apartment,
-		string(c.Kind), c.Message, c.Stage, c.Responsible, dayOrNil(c.InterviewOn),
+		string(c.Kind), c.Message, c.Reason, c.ReasonNote,
+		c.Stage, c.Responsible, dayOrNil(c.InterviewOn),
 		c.Note, c.MemberID, utc(c.MovedAt), c.MovedBy, c.ID)
 	if err != nil {
 		return err
@@ -287,7 +296,8 @@ func scanCandidate(row interface{ Scan(...any) error }, loc *time.Location) (Can
 	var kind, created, moved string
 	var interview sql.NullString
 	err := row.Scan(&c.ID, &c.Token, &c.FirstName, &c.LastName, &c.Email, &c.Phone,
-		&c.Apartment, &kind, &c.Message, &c.Stage, &c.Responsible, &interview,
+		&c.Apartment, &kind, &c.Message, &c.Reason, &c.ReasonNote,
+		&c.Stage, &c.Responsible, &interview,
 		&c.Note, &c.Source, &c.MemberID, &created, &c.CreatedIP, &moved, &c.MovedBy)
 	if err != nil {
 		return c, err

@@ -68,6 +68,9 @@
 						<dd {{if $edit}}data-edit="telefon" data-id="{{$c.ID}}" data-type="tel"{{end}}>{{with $c.Phone}}{{.}}{{else}}—{{end}}</dd></div>
 					<div><dt>{{t "form.note"}}</dt>
 						<dd {{if $edit}}data-edit="anteckning" data-id="{{$c.ID}}"{{end}}>{{with $c.Note}}{{.}}{{else}}—{{end}}</dd></div>
+					{{/* What the applicant said themselves, so not editable:
+					     correcting somebody's own answer would lose it. */}}
+					{{with .Reason}}<div><dt>{{t "join.why.short"}}</dt><dd>{{.}}</dd></div>{{end}}
 				</dl>
 
 				{{with $c.Message}}<p class="card-said">{{.}}</p>{{end}}

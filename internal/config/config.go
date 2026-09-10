@@ -51,6 +51,7 @@ type Config struct {
 	Contacts   Contacts   `yaml:"contacts"`
 	Sheet      Sheet      `yaml:"sheet"`
 	Chat       Chat       `yaml:"chat"`
+	Join       Join       `yaml:"join"`
 	Pipeline   Pipeline   `yaml:"pipeline"`
 	Sync       Sync       `yaml:"sync"`
 
@@ -393,6 +394,57 @@ func cleanAddresses(in []string) []string {
 	return out
 }
 
+// Join is the public page where somebody puts their name down.
+//
+// Only vänmedlem can be applied for. Bomedlem is not a thing you ask to be:
+// it follows from moving in, which is a separate decision on a separate day
+// made by whoever allocates the flat. Offering it as a choice on a public
+// form invited people to apply for something nobody could grant them.
+//
+// What is asked instead is why — and the reasons are configuration rather
+// than code, because they are this house's own life. A house with a
+// woodworking shop and no choir should not need a release to say so.
+type Join struct {
+	Reasons []Reason `yaml:"reasons"`
+}
+
+// Reason is one answer to "why do you want to join".
+type Reason struct {
+	ID     string `yaml:"id"`
+	Name   string `yaml:"name"`
+	NameEN string `yaml:"name_en"`
+}
+
+// NameFor gives the reason's words in one language.
+func (r Reason) NameFor(lang string) string { return pick(lang, r.Name, r.NameEN) }
+
+// ReasonOther is the id of the answer that means "something else", which
+// every list ends with and which asks the person to say what they are after.
+// It is built in rather than configured: a list of set answers that cannot be
+// escaped would turn somebody's actual reason into the nearest wrong one.
+const ReasonOther = "other"
+
+// Reason finds one by id. The built-in "something else" is not in the list
+// and is reported as unknown, which is what makes callers handle it.
+func (j Join) Reason(id string) (Reason, bool) {
+	for _, r := range j.Reasons {
+		if r.ID == id {
+			return r, true
+		}
+	}
+	return Reason{}, false
+}
+
+// Offers reports whether an id is an answer the form actually offered, so a
+// hand-made request cannot record a reason nobody could have chosen.
+func (j Join) Offers(id string) bool {
+	if id == ReasonOther {
+		return true
+	}
+	_, ok := j.Reason(id)
+	return ok
+}
+
 // Chat is where the registry announces what happened.
 //
 // Two channels rather than one, because the two audiences are different. The
@@ -661,6 +713,40 @@ func (c *Config) normalise() error {
 	c.Sheet.ID = strings.TrimSpace(c.Sheet.ID)
 	c.Chat.Candidates = strings.TrimSpace(c.Chat.Candidates)
 	c.Chat.Registry = strings.TrimSpace(c.Chat.Registry)
+
+	if len(c.Join.Reasons) == 0 {
+		// The house's own life, as it stands. Following the pipeline stages:
+		// defaults in code so a fresh deployment works, and a house that
+		// wants different ones says so in the file rather than in a release.
+		c.Join.Reasons = []Reason{
+			{ID: "flytta-in", Name: "Jag vill flytta in", NameEN: "I would like to move in"},
+			{ID: "middagar", Name: "Gemensamma middagar", NameEN: "The shared dinners"},
+			{ID: "spelkvallar", Name: "Spelkvällar", NameEN: "Board game nights"},
+			{ID: "koren", Name: "Kören", NameEN: "The choir"},
+			{ID: "karaoke", Name: "Karaoke", NameEN: "Karaoke"},
+			{ID: "familj", Name: "Jag har familj eller vänner i huset", NameEN: "I have family or friends in the house"},
+		}
+	}
+	seenReason := map[string]bool{}
+	for i := range c.Join.Reasons {
+		r := &c.Join.Reasons[i]
+		r.ID = strings.ToLower(strings.TrimSpace(r.ID))
+		r.Name = strings.TrimSpace(r.Name)
+		r.NameEN = strings.TrimSpace(r.NameEN)
+		if r.ID == "" {
+			return fmt.Errorf("join.reasons has an entry with no id")
+		}
+		if r.ID == ReasonOther {
+			return fmt.Errorf("join.reasons may not define %q: it is always offered last and asks the person to say what they are after", ReasonOther)
+		}
+		if r.Name == "" {
+			return fmt.Errorf("join reason %q has no name", r.ID)
+		}
+		if seenReason[r.ID] {
+			return fmt.Errorf("two join reasons share the id %q", r.ID)
+		}
+		seenReason[r.ID] = true
+	}
 
 	if len(c.Pipeline.Stages) == 0 {
 		// The stages the interview team already worked in, taken from the

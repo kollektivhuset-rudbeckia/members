@@ -707,6 +707,20 @@ textarea:hover { border-color: var(--base-300); }
 	overflow: hidden;
 }
 
+/* The reasons somebody gives for joining. Radio buttons rather than a menu:
+   a handful of short answers read faster at a glance than they open. */
+.reasons { border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.15rem; }
+.reasons legend { padding: 0 .4rem; font-weight: 500; }
+.reasons .hint { display: block; margin: 0 0 .7rem; }
+.choice {
+	display: flex; align-items: baseline; gap: .55rem;
+	padding: .4rem .1rem; cursor: pointer; line-height: 1.4;
+}
+.choice input { margin: 0; flex: 0 0 auto; }
+.choice:hover span { color: var(--text); }
+.reason-other { margin: .6rem 0 0; padding-left: 1.6rem; }
+.reason-other label { display: block; margin-bottom: .3rem; font-size: .9rem; }
+
 .pay-ways { display: grid; gap: 1.5rem; }
 @media (min-width: 46rem) {
 	.pay-ways { grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }

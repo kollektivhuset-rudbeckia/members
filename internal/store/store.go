@@ -66,6 +66,8 @@ CREATE TABLE IF NOT EXISTS candidates (
 	apartment     TEXT NOT NULL DEFAULT '',
 	kind          TEXT NOT NULL DEFAULT 'van',
 	message       TEXT NOT NULL DEFAULT '',
+	reason        TEXT NOT NULL DEFAULT '',
+	reason_note   TEXT NOT NULL DEFAULT '',
 	stage         TEXT NOT NULL,
 	responsible   TEXT NOT NULL DEFAULT '',
 	interview_on  TEXT,
@@ -200,6 +202,26 @@ func migrate(db *sql.DB) error {
 	if !have["also_in"] {
 		if _, err := db.Exec(`ALTER TABLE members ADD COLUMN also_in TEXT NOT NULL DEFAULT ''`); err != nil {
 			return fmt.Errorf("add column also_in: %w", err)
+		}
+	}
+
+	// reason and reason_note: why somebody wants to join. The public form used
+	// to ask which membership they were after, which was the wrong question —
+	// bomedlem is not something you can apply for. Candidates recorded before
+	// this keep an empty reason, which reads as "nobody asked" rather than as
+	// a reason nobody chose.
+	cand, err := columns(db, "candidates")
+	if err != nil {
+		return err
+	}
+	if !cand["reason"] {
+		if _, err := db.Exec(`ALTER TABLE candidates ADD COLUMN reason TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add column reason: %w", err)
+		}
+	}
+	if !cand["reason_note"] {
+		if _, err := db.Exec(`ALTER TABLE candidates ADD COLUMN reason_note TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add column reason_note: %w", err)
 		}
 	}
 	return nil

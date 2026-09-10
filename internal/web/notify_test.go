@@ -20,7 +20,7 @@ func TestAnInterestRegistrationReachesTheInterviewTeam(t *testing.T) {
 		"efternamn":  {"Öberg"},
 		"epost":      {"asa@example.test"},
 		"telefon":    {"070-123 45 67"},
-		"typ":        {"van"},
+		"varfor":     {"middagar"},
 		"meddelande": {"Jag hörde om huset av en vän."},
 	})
 	if rec.Code != http.StatusSeeOther {
@@ -34,7 +34,7 @@ func TestAnInterestRegistrationReachesTheInterviewTeam(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Ny intresseanmälan", "asa@example.test", "070-123 45 67",
-		"Vänmedlem", "Jag hörde om huset av en vän.", "/kandidater",
+		"Gemensamma middagar", "Jag hörde om huset av en vän.", "/kandidater",
 	} {
 		if !strings.Contains(got.Message, want) {
 			t.Errorf("the message does not mention %q:\n%s", want, got.Message)
@@ -175,7 +175,7 @@ func TestAMessageCannotBeRearrangedByWhatSomebodyTypes(t *testing.T) {
 		"fornamn":   {"Eva|**Styrelsen**"},
 		"efternamn": {"Test"},
 		"epost":     {"eva@example.test"},
-		"typ":       {"van"},
+		"varfor":    {"middagar"},
 		// A newline in a note would otherwise break out of the table.
 		"meddelande": {"rad ett\n| **E-post** | forged@example.test |"},
 	})
@@ -213,7 +213,7 @@ func TestTestModeSendsADirectMessageInsteadOfAnnouncing(t *testing.T) {
 
 	rec := h.do(t, config.RoleNone, "POST", "/bli-medlem", url.Values{
 		"fornamn": {"Nils"}, "efternamn": {"Test"},
-		"epost": {"nils@example.test"}, "typ": {"van"},
+		"epost": {"nils@example.test"}, "varfor": {"middagar"},
 	})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("the form: got %d", rec.Code)
@@ -241,7 +241,7 @@ func TestWithoutMattermostEverythingElseStillWorks(t *testing.T) {
 
 	rec := h.do(t, config.RoleNone, "POST", "/bli-medlem", url.Values{
 		"fornamn": {"Bo"}, "efternamn": {"Test"},
-		"epost": {"bo@example.test"}, "typ": {"van"},
+		"epost": {"bo@example.test"}, "varfor": {"middagar"},
 	})
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("the form: got %d, want it to work without a chat server", rec.Code)

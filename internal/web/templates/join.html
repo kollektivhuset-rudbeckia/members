@@ -19,15 +19,16 @@
 
 <section class="panel">
 	<h2>{{t "join.kinds"}}</h2>
+	<p>{{t "join.kinds.lede"}}</p>
 	<dl class="facts-list">
-		<div><dt>{{t "kind.bo"}}</dt><dd>{{t "join.kind.bo"}}</dd></div>
 		<div><dt>{{t "kind.van"}}</dt><dd>{{t "join.kind.van"}}</dd></div>
+		<div><dt>{{t "kind.bo"}}</dt><dd>{{t "join.kind.bo"}}</dd></div>
 	</dl>
 </section>
 
 <section class="panel">
 	<h2>{{t "join.cost"}}</h2>
-	<p class="price"><strong>{{money $d.FeeBo}}</strong> <span>{{t "join.cost.year" $d.Year}}</span></p>
+	<p class="price"><strong>{{money $d.Fee}}</strong> <span>{{t "join.cost.year" $d.Year}}</span></p>
 	{{if $d.FeeChanges}}<p class="hint">{{t "join.cost.next" $d.NextYear (money $d.FeeNext)}}</p>{{end}}
 	<p class="hint">{{t "join.cost.when"}}</p>
 	<p class="hint">{{t "join.cost.how"}}</p>
@@ -73,16 +74,41 @@
 				<input id="telefon" name="telefon" type="tel" value="{{$f.Phone}}"
 				       autocomplete="tel" maxlength="200">
 			</div>
-			<div class="field">
-				<label for="typ">{{t "join.wanting"}}</label>
-				<select id="typ" name="typ">
-					{{range $d.Kinds}}
-					<option value="{{.Kind}}" {{if eq $f.Kind (printf "%s" .Kind)}}selected{{end}}>{{.Label}}</option>
-					{{end}}
-				</select>
-				<small class="hint">{{t "join.wanting.hint"}}</small>
-				{{with $f.Err "kind"}}<small class="field-error">{{t .}}</small>{{end}}
-			</div>
+			{{/* Radio buttons rather than a menu: seven short answers are
+			     quicker to read at a glance than to open, and the last one
+			     reveals a text field, which a menu cannot do without
+			     JavaScript. */}}
+			<fieldset class="field field-wide reasons">
+				<legend>{{t "join.why"}}</legend>
+				<small class="hint">{{t "join.why.hint"}}</small>
+				{{range $d.Reasons}}
+				<label class="choice">
+					<input type="radio" name="varfor" value="{{.ID}}"
+					       {{if $f.Chose .ID}}checked{{end}}>
+					<span>{{.NameFor (printf "%s" $.Lang)}}</span>
+				</label>
+				{{end}}
+				<label class="choice">
+					<input type="radio" name="varfor" value="{{$d.Other}}"
+					       {{if $f.Chose $d.Other}}checked{{end}} data-reveals="#varfor-annat">
+					<span>{{t "join.why.other"}}</span>
+				</label>
+				{{with $f.Err "reason"}}<small class="field-error">{{t .}}</small>{{end}}
+
+				{{/* Not hidden by default. Without JavaScript nothing would
+				     ever reveal it, and somebody who picked "something else"
+				     would be told to write a few words in a box they cannot
+				     see. The script below collapses it instead, so the
+				     no-script path is a visible field and the enhanced path
+				     is a tidier form. */}}
+				<div class="reason-other" id="varfor-annat">
+					<label for="varfor_annat">{{t "join.why.other.what"}}</label>
+					<input id="varfor_annat" name="varfor_annat" type="text"
+					       value="{{$f.ReasonNote}}" maxlength="500"
+					       placeholder="{{t "join.why.other.hint"}}">
+					{{with $f.Err "reason_note"}}<small class="field-error">{{t .}}</small>{{end}}
+				</div>
+			</fieldset>
 			<div class="field field-wide">
 				<label for="meddelande">{{t "join.message"}} <small>{{t "optional"}}</small></label>
 				<textarea id="meddelande" name="meddelande" rows="4" maxlength="2000"
