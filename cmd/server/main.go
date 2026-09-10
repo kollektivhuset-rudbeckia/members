@@ -23,6 +23,7 @@ import (
 	"github.com/kollektivhuset-rudbeckia/members/internal/demo"
 	"github.com/kollektivhuset-rudbeckia/members/internal/google"
 	"github.com/kollektivhuset-rudbeckia/members/internal/importer"
+	"github.com/kollektivhuset-rudbeckia/members/internal/mattermost"
 	"github.com/kollektivhuset-rudbeckia/members/internal/store"
 	"github.com/kollektivhuset-rudbeckia/members/internal/sync"
 	"github.com/kollektivhuset-rudbeckia/members/internal/web"
@@ -375,8 +376,33 @@ func run(log *slog.Logger) error {
 			"but the groups, the contacts and the spreadsheet are not being kept in step")
 	}
 
+	// The chat bot. Check the token now: a bot that cannot log in must be a
+	// startup complaint rather than a mystery the first time somebody
+	// registers an interest through the public page.
+	chat := mattermost.New(rt.Chat.URL, rt.Chat.Token, log)
+	if chat.Enabled() {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		me, err := chat.Verify(ctx)
+		cancel()
+		if err != nil {
+			return fmt.Errorf("mattermost: %w", err)
+		}
+		switch {
+		case rt.Chat.TestUser != "":
+			log.Warn("mattermost is in test mode: every announcement goes to one "+
+				"person as a direct message and no channel is written to",
+				"bot", me.Username, "to", rt.Chat.TestUser)
+		default:
+			log.Info("mattermost bot ready", "server", rt.Chat.URL, "bot", me.Username,
+				"candidates_channel", cfg.Chat.Candidates, "registry_channel", cfg.Chat.Registry)
+		}
+	} else if !rt.Demo {
+		log.Warn("Mattermost is not configured: changes are recorded and logged, " +
+			"but nothing is announced in the chat")
+	}
+
 	guard := auth.New(rt)
-	srv, err := web.New(cfg, rt, st, guard, syncer, log)
+	srv, err := web.New(cfg, rt, st, guard, syncer, chat, log)
 	if err != nil {
 		return err
 	}

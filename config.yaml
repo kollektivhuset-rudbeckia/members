@@ -131,6 +131,27 @@ sheet:
   tab: Medlemmar
   # Så här många år tillbaka får en egen kolumn med inbetalda kronor.
   years: 5
+# --------------------------------------------------------------------------
+# Aviseringar i Mattermost. Roboten skriver bara — den läser aldrig chatten
+# och tar aldrig emot något därifrån som en instruktion.
+#
+# Kanalerna anges med id och inte med namn: ett namn kan bytas av vem som
+# helst i kanalen, och en avisering som tyst slutar komma fram för att någon
+# döpt om en kanal är värre än en som går sönder högt. Serveradressen och
+# robotens token sätts i .env (MATTERMOST_URL, MATTERMOST_TOKEN).
+chat:
+  # Förmedling — intervjugruppen. Får varje ny intresseanmälan från
+  # /bli-medlem, och inget annat.
+  candidates_channel: qfuyrtjxbbfe3kya3gtti9y41e
+  # registry-changes — styrelsen. Får ändringar i registret: nya medlemmar,
+  # ändrade, borttagna, och förslag som väntar på beslut.
+  registry_channel: c41rtmgbo38gfj334g4xihm8rw
+  # Händelser som skrivs i loggen men inte aviseras. Avgifter prickas av
+  # många i rad i februari, och de hör hos kassörerna snarare än styrelsen.
+  mute:
+    - payment.recorded
+    - payment.withdrawn
+
 
 sync:
   # Hur ofta allt jämförs med Google.

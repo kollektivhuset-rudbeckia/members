@@ -22,6 +22,7 @@ import (
 	"github.com/kollektivhuset-rudbeckia/members/internal/auth"
 	"github.com/kollektivhuset-rudbeckia/members/internal/config"
 	"github.com/kollektivhuset-rudbeckia/members/internal/i18n"
+	"github.com/kollektivhuset-rudbeckia/members/internal/mattermost"
 	"github.com/kollektivhuset-rudbeckia/members/internal/membership"
 	"github.com/kollektivhuset-rudbeckia/members/internal/store"
 	"github.com/kollektivhuset-rudbeckia/members/internal/sync"
@@ -45,6 +46,11 @@ type Server struct {
 	sync  *sync.Syncer
 	log   *slog.Logger
 	now   func() time.Time
+
+	// chat announces what happened to the two channels the house reads. It is
+	// never nil: an unconfigured client logs instead of sending, so no call
+	// site has to ask whether Mattermost exists.
+	chat *mattermost.Client
 
 	// tpl holds one parsed set per language. The language is baked into the
 	// template functions, so a page says {{t "key"}} and gets the right words
@@ -70,9 +76,15 @@ var layouts = []string{"base.html", "fields.html", "panels.html"}
 
 // New builds the HTTP server.
 func New(cfg *config.Config, rt config.Runtime, st *store.Store, guard *auth.Guard,
-	syncer *sync.Syncer, log *slog.Logger) (*Server, error) {
+	syncer *sync.Syncer, chat *mattermost.Client, log *slog.Logger) (*Server, error) {
 
-	s := &Server{cfg: cfg, rt: rt, store: st, guard: guard, sync: syncer, log: log, now: time.Now}
+	if chat == nil {
+		// A disabled client rather than a nil one, so that notify.go never
+		// needs a nil check and forgetting one cannot panic a request.
+		chat = mattermost.New("", "", log)
+	}
+	s := &Server{cfg: cfg, rt: rt, store: st, guard: guard, sync: syncer,
+		chat: chat, log: log, now: time.Now}
 	var err error
 	if s.assets, err = hashAssets(); err != nil {
 		return nil, err

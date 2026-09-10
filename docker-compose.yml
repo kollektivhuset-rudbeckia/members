@@ -31,6 +31,16 @@ services:
       GROUP_KEEP_BO: ${GROUP_KEEP_BO:-}
       GROUP_KEEP_VAN: ${GROUP_KEEP_VAN:-}
 
+      # --- Aviseringar i Mattermost -----------------------------------------
+      # Vilka kanaler som används står i config.yaml. Utan token aviseras
+      # ingenting; registret fungerar precis som förut.
+      MATTERMOST_URL: ${MATTERMOST_URL:-}
+      MATTERMOST_TOKEN: ${MATTERMOST_TOKEN:-}
+      # Satt: varje avisering går som direktmeddelande till den här
+      # användaren i stället för till någon kanal. För att läsa igenom
+      # meddelandena innan hela huset ser dem.
+      MATTERMOST_TEST_USER: ${MATTERMOST_TEST_USER:-}
+
       # --- Frivilligt ------------------------------------------------------
       SESSION_SECRET: ${SESSION_SECRET:-}
       SESSION_HOURS: ${SESSION_HOURS:-12}

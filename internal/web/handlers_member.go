@@ -495,6 +495,12 @@ func (s *Server) propose(w http.ResponseWriter, r *http.Request, v *view,
 // audit appends to the trail, keeping the member's name and address as they
 // were so the line still reads after the row is gone.
 func (s *Server) audit(ctx context.Context, v *view, action string, m store.Member, detail string) {
+	// Announce first, from here rather than from each handler. Every change
+	// the register makes already passes through this one function, so hanging
+	// the chat off it means a handler written next year is announced without
+	// anybody remembering to do it.
+	s.announceChange(v.Session.Email, string(v.Role), action, m, detail)
+
 	err := s.store.Log(ctx, store.Entry{
 		At: s.now(), Actor: v.Session.Email, Role: string(v.Role), Action: action,
 		MemberID: m.ID, Subject: m.Name() + " <" + m.Email + ">", Detail: detail,

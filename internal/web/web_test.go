@@ -25,6 +25,10 @@ membership: {fee_kr: 200, due_on: "03-31", grace_days: 14, new_member_days: 45}
 groups:
   - {kind: bo, email: bomedlemmar@example.test}
   - {kind: van, email: friends@example.test}
+chat:
+  candidates_channel: chan-candidates
+  registry_channel: chan-registry
+  mute: [payment.recorded, payment.withdrawn]
 `
 
 type harness struct {
@@ -33,6 +37,7 @@ type harness struct {
 	rt     config.Runtime
 	cfg    *config.Config
 	now    time.Time
+	chat   *fakeChat
 }
 
 func newHarness(t *testing.T) *harness {
@@ -66,14 +71,15 @@ func newHarness(t *testing.T) *harness {
 	// looks like.
 	syncer := sync.New(cfg, rt, st, nil, log)
 
-	srv, err := New(cfg, rt, st, auth.New(rt), syncer, log)
+	chat := newFakeChat(t)
+	srv, err := New(cfg, rt, st, auth.New(rt), syncer, chat.client(t), log)
 	if err != nil {
 		t.Fatal(err)
 	}
 	now := time.Date(2026, time.June, 1, 12, 0, 0, 0, cfg.Location())
 	srv.now = func() time.Time { return now }
 
-	return &harness{server: srv, store: st, rt: rt, cfg: cfg, now: now}
+	return &harness{server: srv, store: st, rt: rt, cfg: cfg, now: now, chat: chat}
 }
 
 // as returns a request cookie for a signed-in role.
@@ -603,7 +609,7 @@ func TestARoleRevokedInTheConfigurationLocksTheSessionOut(t *testing.T) {
 	delete(h.rt.Accounts, "ekonomi@example.test")
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	srv, err := New(h.cfg, h.rt, h.store, auth.New(h.rt),
-		sync.New(h.cfg, h.rt, h.store, nil, log), log)
+		sync.New(h.cfg, h.rt, h.store, nil, log), h.chat.client(t), log)
 	if err != nil {
 		t.Fatal(err)
 	}

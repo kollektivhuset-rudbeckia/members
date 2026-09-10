@@ -50,6 +50,7 @@ type Config struct {
 	Groups     []Group    `yaml:"groups"`
 	Contacts   Contacts   `yaml:"contacts"`
 	Sheet      Sheet      `yaml:"sheet"`
+	Chat       Chat       `yaml:"chat"`
 	Pipeline   Pipeline   `yaml:"pipeline"`
 	Sync       Sync       `yaml:"sync"`
 
@@ -392,6 +393,39 @@ func cleanAddresses(in []string) []string {
 	return out
 }
 
+// Chat is where the registry announces what happened.
+//
+// Two channels rather than one, because the two audiences are different. The
+// interview team wants to know the moment somebody registers an interest, and
+// nothing else; the board wants to see the register change and does not need
+// a message every time a stranger fills in the public form.
+//
+// Channels are given by id rather than by name. A name can be renamed by
+// anybody in the channel, and an announcement that quietly stops arriving
+// because a channel was renamed is worse than one that fails loudly.
+type Chat struct {
+	// Candidates is the channel the interview team reads: förmedling.
+	Candidates string `yaml:"candidates_channel"`
+	// Registry is the channel the board reads: registry-changes.
+	Registry string `yaml:"registry_channel"`
+	// Mute lists audit actions that are recorded but not announced. It exists
+	// because the register's own idea of "a change" is broader than what a
+	// channel wants to hear: a cashier ticking off a hundred fees in February
+	// is a hundred entries in the trail and would be a hundred messages.
+	// Empty means announce everything the trail records.
+	Mute []string `yaml:"mute"`
+}
+
+// Announces reports whether an audit action should reach the chat.
+func (c Chat) Announces(action string) bool {
+	for _, m := range c.Mute {
+		if strings.EqualFold(strings.TrimSpace(m), action) {
+			return false
+		}
+	}
+	return true
+}
+
 // Sheet is the spreadsheet the cashiers calculate in. The registry owns the
 // tab named here and overwrites it on every run, so nobody should type into
 // it — put formulas on a second tab that reads from this one.
@@ -625,6 +659,8 @@ func (c *Config) normalise() error {
 		}
 	}
 	c.Sheet.ID = strings.TrimSpace(c.Sheet.ID)
+	c.Chat.Candidates = strings.TrimSpace(c.Chat.Candidates)
+	c.Chat.Registry = strings.TrimSpace(c.Chat.Registry)
 
 	if len(c.Pipeline.Stages) == 0 {
 		// The stages the interview team already worked in, taken from the

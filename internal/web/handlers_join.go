@@ -223,6 +223,10 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("somebody would like to join", "name", c.Name(), "email", c.Email, "kind", c.Kind)
+	// Tell the interview team now, not at the next sync. Somebody who fills
+	// in this form and hears nothing is the worst thing the register can do
+	// to a person, and a channel message is how a human gets to them today.
+	s.announceInterest(c)
 	http.Redirect(w, r, "/bli-medlem/tack/"+c.Token, http.StatusSeeOther)
 }
 

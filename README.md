@@ -421,6 +421,43 @@ bara för att avgöra om två stavningar är samma brevlåda.
 
 ---
 
+## Aviseringar i Mattermost
+
+Registret berättar i chatten vad som hänt. Två kanaler, för att de två
+läsargrupperna vill veta olika saker:
+
+| Kanal | Får | Varför |
+|---|---|---|
+| **Förmedling** | ny intresseanmälan från `/bli-medlem` | Den som fyller i formuläret och inte hör något är det värsta registret kan göra mot en människa. Intervjugruppen ser den direkt och en människa kan svara samma dag. |
+| **registry-changes** | ny medlem, ändrad, borttagen, och förslag som väntar på beslut | Styrelsen ser vad som händer i registret utan att sitta i det. |
+
+Avgifter aviseras inte. De prickas av många i rad i februari, och de hör hos
+kassörerna snarare än hos styrelsen. De skrivs i loggen som allt annat, och
+kan slås på genom att ta bort dem ur `chat.mute` i `config.yaml`.
+
+**Aviseringarna hänger på loggen, inte på varje handler.** Varje ändring
+registret gör passerar redan `audit()`, så det är där chatten sitter. En
+handler som skrivs nästa år aviseras utan att någon behöver komma ihåg det —
+det som hamnar i loggen hamnar i kanalen.
+
+**Roboten skriver bara.** Den läser aldrig chatten och tar aldrig emot något
+därifrån som en instruktion. Kanalerna anges med id och inte med namn: ett
+namn kan bytas av vem som helst i kanalen, och en avisering som tyst slutar
+komma fram för att någon döpt om en kanal är värre än en som går sönder högt.
+
+**Ingenting blir långsammare av det.** Meddelandena skickas i bakgrunden med
+egen timeout, så en chattserver som ligger nere kan varken sakta ner eller
+fälla en sida. Det som inte gick fram hamnar i loggen.
+
+**Att läsa igenom meddelandena först.** Sätt `MATTERMOST_TEST_USER` till ett
+Mattermost-användar-id, och varje avisering går som direktmeddelande dit i
+stället för till någon kanal — med kanalen den *skulle* ha gått till angiven i
+meddelandet, eftersom det är routningen som är värd att kontrollera. Töm
+variabeln när det ska ut på riktigt.
+
+Roboten behöver få skriva i båda kanalerna. Utan `MATTERMOST_URL` och
+`MATTERMOST_TOKEN` aviseras ingenting och registret fungerar exakt som förut.
+
 ## Kalkylarket
 
 Fliken som står i `sheet.tab` **ägs av registret och skrivs om vid varje

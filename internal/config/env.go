@@ -162,6 +162,7 @@ type Runtime struct {
 	SessionMaxAge time.Duration
 	TrustProxy    bool
 	Access        Access
+	Chat          ChatSettings
 
 	// Google is how the registry signs people in and how it reaches Workspace.
 	Google GoogleSettings
@@ -174,6 +175,27 @@ type Runtime struct {
 	// banner on every page and a sign-in page that just asks which of the
 	// three roles you would like to be. Never enable it on a real deployment.
 	Demo bool
+}
+
+// ChatSettings is the bot that announces changes in Mattermost. The server
+// and the token live here rather than in the configuration file because one
+// is deployment-specific and the other is a credential; which channels the
+// association uses is ordinary configuration and lives in config.yaml.
+type ChatSettings struct {
+	// URL is the Mattermost server, e.g. "https://chat.rudbeckia.nu".
+	URL string
+	// Token is the bot account's personal access token.
+	Token string
+	// TestUser is a Mattermost user id to send to instead of any channel.
+	// It exists so the messages can be read by whoever is writing them
+	// before the whole house sees them: with it set, every announcement goes
+	// there as a direct message and no channel is written to at all.
+	TestUser string
+}
+
+// Enabled reports whether the bot can really reach Mattermost.
+func (c ChatSettings) Enabled() bool {
+	return strings.TrimSpace(c.URL) != "" && strings.TrimSpace(c.Token) != ""
 }
 
 // GoogleSettings is everything needed to talk to Google: the OAuth client
@@ -223,9 +245,14 @@ type ServiceAccount struct {
 func LoadRuntime() (Runtime, error) {
 	demo := envBool("DEMO", false)
 	rt := Runtime{
-		Demo:          demo,
-		ListenAddr:    env("LISTEN_ADDR", ":8080"),
-		ConfigPath:    env("CONFIG_PATH", "config.yaml"),
+		Demo:       demo,
+		ListenAddr: env("LISTEN_ADDR", ":8080"),
+		ConfigPath: env("CONFIG_PATH", "config.yaml"),
+		Chat: ChatSettings{
+			URL:      strings.TrimRight(strings.TrimSpace(os.Getenv("MATTERMOST_URL")), "/"),
+			Token:    strings.TrimSpace(os.Getenv("MATTERMOST_TOKEN")),
+			TestUser: strings.TrimSpace(os.Getenv("MATTERMOST_TEST_USER")),
+		},
 		DBPath:        env("DB_PATH", "data/members.db"),
 		BaseURL:       strings.TrimRight(env("BASE_URL", "http://localhost:8080"), "/"),
 		SessionMaxAge: time.Duration(envInt("SESSION_HOURS", 12)) * time.Hour,
@@ -288,6 +315,15 @@ func LoadRuntime() (Runtime, error) {
 		}
 		rt.SessionSecret = b
 	}
+	// Half-configured is a mistake worth refusing at boot rather than
+	// discovering as silence when the first person registers an interest.
+	if (rt.Chat.URL == "") != (rt.Chat.Token == "") {
+		return rt, errors.New("set both MATTERMOST_URL and MATTERMOST_TOKEN, or neither")
+	}
+	if rt.Chat.TestUser != "" && !rt.Chat.Enabled() {
+		return rt, errors.New("MATTERMOST_TEST_USER needs MATTERMOST_URL and MATTERMOST_TOKEN")
+	}
+
 	return rt, nil
 }
 
