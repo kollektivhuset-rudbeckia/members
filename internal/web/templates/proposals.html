@@ -1,7 +1,15 @@
 {{define "content"}}
 <div class="hero">
-	<h1>{{t "proposals.title"}}</h1>
-	<p class="lede">{{t "proposals.lede" .Data.Board}}</p>
+	<h1>
+		{{t "proposals.title"}}
+		{{/* <details> rather than a scripted tooltip: it opens and closes on
+		     its own, it is reachable from the keyboard, and it works before
+		     any script has run. */}}
+		<details class="info">
+			<summary aria-label="{{t "info.about"}}" title="{{t "info.about"}}"><span aria-hidden="true">i</span></summary>
+			<p>{{t "proposals.lede" .Data.Board}}</p>
+		</details>
+	</h1>
 </div>
 
 <section class="panel">
@@ -25,8 +33,6 @@
 				<small class="muted">{{t "proposals.by" $p.ProposedBy (stamp (local $p.ProposedAt))}}</small>
 			</header>
 
-			{{with $p.Reason}}<p class="proposal-reason">{{.}}</p>{{end}}
-
 			{{if .Deletion}}
 			<p class="alert alert-error">{{t "proposals.deletewarn" $p.Before.Email}}</p>
 			{{else if .Changes}}
@@ -45,7 +51,21 @@
 				</table>
 			</div>
 			{{else}}
-			<p class="muted">{{t "proposals.nochange"}}</p>
+			{{/* A proposal that changes nothing can no longer be filed. One
+			     from before that rule still has to say what it is. */}}
+			<p class="alert alert-warn">{{t "proposals.nochange"}}</p>
+			{{end}}
+
+			{{/* Why, in the proposer's own words, under what they are asking
+			     for. The board reads the fields to decide what happens and
+			     this to decide whether it should. */}}
+			{{with $p.Reason}}
+			<figure class="proposal-reason">
+				<figcaption>{{t "proposals.reason"}}</figcaption>
+				<blockquote>{{.}}</blockquote>
+			</figure>
+			{{else}}
+			<p class="muted small proposal-noreason">{{t "proposals.noreason"}}</p>
 			{{end}}
 
 			<footer class="proposal-actions">

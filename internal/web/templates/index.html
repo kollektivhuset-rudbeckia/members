@@ -45,7 +45,7 @@
 
 <section class="panel">
 	<h2 class="visually-hidden">{{t "filter.title"}}</h2>
-	<form method="get" action="/" class="filter-form">
+	<form method="get" action="/" class="filter-form" data-live-search="#resultat">
 		<div class="field grow">
 			<label for="sok">{{t "filter.search"}}</label>
 			{{/* The box only filters in the browser when the whole register is
@@ -54,9 +54,7 @@
 			     there is more than one page it submits and the server
 			     searches the lot. */}}
 			<input id="sok" name="sok" type="search" value="{{$f.Query}}"
-			       placeholder="{{t "filter.search.hint"}}" autocomplete="off"
-			       {{if .Data.Pages.Complete}}data-table-filter="#roster"{{end}}>
-			{{if not .Data.Pages.Complete}}<small class="hint">{{t "filter.search.whole"}}</small>{{end}}
+			       placeholder="{{t "filter.search.hint"}}" autocomplete="off">
 		</div>
 		<div class="field">
 			<label for="typ">{{t "filter.kind"}}</label>
@@ -95,13 +93,12 @@
 	</form>
 </section>
 
-<section class="panel">
+<section class="panel" id="resultat" aria-live="polite" aria-busy="false">
 	<div class="panel-head">
 		<h2>
 			{{count "member" .Data.Pages.Total}}
 			{{if ne .Data.Pages.Total .Data.Total}}<small class="muted">{{t "register.of" .Data.Total}}</small>{{end}}
 		</h2>
-		<p class="muted small" data-filter-count hidden></p>
 	</div>
 
 	{{if .Data.Rows}}
@@ -140,7 +137,6 @@
 			</tbody>
 		</table>
 	</div>
-	<p class="empty" data-filter-empty hidden>{{t "register.nomatch"}}</p>
 	{{template "pager" dict "Q" $q "Pages" .Data.Pages "Base" "/"}}
 	{{else}}
 	<p class="empty">{{t "register.nomatch"}}</p>

@@ -707,6 +707,41 @@ textarea:hover { border-color: var(--base-300); }
 	overflow: hidden;
 }
 
+/* An (i) that opens a short explanation. <details> does the work, so it
+   needs no script and answers the keyboard on its own. */
+.info { display: inline-block; position: relative; vertical-align: middle; margin-left: .5rem; }
+.info > summary {
+	list-style: none; cursor: help; width: 1.35rem; height: 1.35rem;
+	display: inline-flex; align-items: center; justify-content: center;
+	border: 1px solid var(--line); border-radius: 50%;
+	font-family: var(--font-serif, Georgia, serif); font-style: italic;
+	font-size: .85rem; font-weight: 500; color: var(--text-faint);
+	line-height: 1; user-select: none;
+}
+.info > summary::-webkit-details-marker { display: none; }
+.info > summary:hover, .info[open] > summary { border-color: var(--accent-line); color: var(--text); }
+.info > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.info > p {
+	position: absolute; z-index: 20; left: 0; top: calc(100% + .4rem);
+	width: max-content; max-width: min(30rem, 80vw); margin: 0;
+	background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
+	padding: .7rem .85rem; font-size: .88rem; font-weight: 400; line-height: 1.5;
+	color: var(--text-muted, var(--text)); box-shadow: 0 6px 20px rgba(0,0,0,.12);
+}
+@media (max-width: 32rem) { .info > p { position: static; width: auto; max-width: none; margin-top: .4rem; } }
+
+/* What the board is deciding: the fields above, the proposer's words below. */
+.proposal-reason { margin: .9rem 0 0; }
+.proposal-reason figcaption {
+	font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+	color: var(--text-faint); margin-bottom: .3rem;
+}
+.proposal-reason blockquote {
+	margin: 0; padding: .55rem .8rem; border-left: 3px solid var(--accent-line, var(--line));
+	background: var(--bg-sunk, transparent); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.proposal-noreason { margin: .9rem 0 0; }
+
 /* The reasons somebody gives for joining. Radio buttons rather than a menu:
    a handful of short answers read faster at a glance than they open. */
 .reasons { border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.15rem; }

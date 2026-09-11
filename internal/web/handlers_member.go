@@ -465,11 +465,33 @@ func (s *Server) removeMember(ctx context.Context, v *view, m store.Member, reas
 func (s *Server) propose(w http.ResponseWriter, r *http.Request, v *view,
 	m store.Member, kind store.ProposalKind, after store.Snapshot, reason string) {
 
-	pending, err := s.store.ProposalsFor(r.Context(), m.ID)
-	if err == nil && firstPending(pending) != nil {
-		s.flash(w, "warn", "flash.alreadypending")
+	// A proposal that would change nothing must never reach the board. They
+	// would be asked to decide something that does nothing when decided, and
+	// whoever filed it would be left thinking the change was on its way.
+	if kind == store.ProposeUpdate && after == store.SnapshotOf(m) {
+		s.flash(w, "warn", "flash.nochange")
 		http.Redirect(w, r, "/medlem/"+m.ID, http.StatusSeeOther)
 		return
+	}
+
+	pending, err := s.store.ProposalsFor(r.Context(), m.ID)
+	if open := firstPending(pending); err == nil && open != nil {
+		// Somebody else's request is not ours to replace: two people asking
+		// for different things about one member is a conversation, not a
+		// race, and silently overwriting theirs would lose it.
+		if !strings.EqualFold(open.ProposedBy, v.Session.Email) {
+			s.flash(w, "warn", "flash.alreadypending")
+			http.Redirect(w, r, "/medlem/"+m.ID, http.StatusSeeOther)
+			return
+		}
+		// Our own, though, is simply an earlier draft of what we are asking
+		// now. Refusing the second edit — which is what used to happen — left
+		// the board approving the first change and the proposer wondering why
+		// the rest never arrived.
+		if err := s.store.DecideProposal(r.Context(), open.ID, store.Stale,
+			v.Session.Email, "ersatt av ett nyare förslag", s.now()); err != nil {
+			s.log.Error("could not retire a superseded proposal", "err", err)
+		}
 	}
 
 	p := store.Proposal{

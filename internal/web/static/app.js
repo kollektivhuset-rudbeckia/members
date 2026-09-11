@@ -50,60 +50,72 @@
 		sync();
 	})();
 
-	// --- Filter the table as you type ---------------------------------------
-	// The same box submits to the server without JavaScript and gets the same
-	// answer. This only saves the round trip, which for a register of a few
-	// hundred people is the difference between searching and browsing.
-	document.querySelectorAll('input[data-table-filter]').forEach(function (box) {
-		var table = document.querySelector(box.getAttribute('data-table-filter'));
-		if (!table) { return; }
-		var body = table.tBodies[0];
-		if (!body) { return; }
+	// --- Search that answers as you type ------------------------------------
+	// The form still works on its own: this only saves the round trip through
+	// a page load. The matching itself stays on the server, so the browser
+	// never has a second opinion about what "matches" means — one register of
+	// a hundred people filtered two different ways is how a row goes missing.
+	document.querySelectorAll('form[data-live-search]').forEach(function (form) {
+		var target = document.querySelector(form.getAttribute('data-live-search'));
+		if (!target || !window.fetch || !window.AbortController) { return; }
 
-		var rows = Array.prototype.slice.call(body.rows).map(function (row) {
-			return { row: row, hay: fold(row.textContent) };
-		});
-		var count = document.querySelector('[data-filter-count]');
-		var empty = document.querySelector('[data-filter-empty]');
+		var timer = null, inflight = null, lastURL = null;
 
-		var apply = function () {
-			var words = fold(box.value).split(/\s+/).filter(Boolean);
-			var shown = 0;
-			rows.forEach(function (entry) {
-				// Every word has to match something, so "anna 14" finds Anna
-				// in apartment 1403 rather than every Anna in the house.
-				var hit = words.every(function (word) { return entry.hay.indexOf(word) !== -1; });
-				entry.row.hidden = !hit;
-				if (hit) { shown++; }
-			});
-			if (empty) { empty.hidden = shown !== 0 || rows.length === 0; }
-			if (count) {
-				var filtering = words.length > 0;
-				count.hidden = !filtering;
-				if (filtering) {
-					count.textContent = shown + ' / ' + rows.length;
-				}
-			}
+		var show = function (html) {
+			var doc = new DOMParser().parseFromString(html, 'text/html');
+			var fresh = doc.querySelector(form.getAttribute('data-live-search'));
+			if (!fresh) { return; }
+			target.innerHTML = fresh.innerHTML;
 		};
 
-		box.addEventListener('input', apply);
-		// Enter would submit and reload with the same result, only slower.
-		box.form.addEventListener('submit', function (event) {
-			if (document.activeElement === box && box.value.trim() !== '') {
-				event.preventDefault();
-				apply();
-			}
-		});
-		if (box.value.trim()) { apply(); }
-	});
+		var run = function () {
+			var url = form.action + '?' + new URLSearchParams(new FormData(form)).toString();
+			if (url === lastURL) { return; }
+			lastURL = url;
+			if (inflight) { inflight.abort(); }
+			inflight = new AbortController();
+			target.setAttribute('aria-busy', 'true');
+			fetch(url, {
+				signal: inflight.signal,
+				headers: { 'X-Requested-With': 'fetch' },
+				credentials: 'same-origin'
+			}).then(function (r) {
+				return r.ok ? r.text() : Promise.reject(r.status);
+			}).then(function (html) {
+				show(html);
+				// The address bar follows, so a reload or a shared link gives
+				// the same list back.
+				window.history.replaceState(null, '', url);
+			}).catch(function (err) {
+				// An aborted request is the next keystroke, not a failure.
+				if (err && err.name === 'AbortError') { return; }
+				// Anything else: leave the page as it was and let the form
+				// work the way it does without this.
+				lastURL = null;
+			}).then(function () {
+				target.setAttribute('aria-busy', 'false');
+			});
+		};
 
-	// fold makes a search insensitive to case and to the Swedish vowels, so
-	// that "ostberg" finds Östberg — which is how the name gets typed when
-	// somebody is in a hurry.
-	function fold(text) {
-		return (text || '').toLowerCase()
-			.replace(/[åä]/g, 'a').replace(/ö/g, 'o').replace(/é/g, 'e');
-	}
+		// Typing is debounced; picking from a menu is not, because that is a
+		// finished decision rather than a half-typed word.
+		form.querySelectorAll('input[type="search"], input[type="text"]').forEach(function (box) {
+			box.addEventListener('input', function () {
+				window.clearTimeout(timer);
+				timer = window.setTimeout(run, 120);
+			});
+		});
+		form.querySelectorAll('select').forEach(function (menu) {
+			menu.addEventListener('change', run);
+		});
+		// Enter would otherwise reload the page to reach the list it is
+		// already showing.
+		form.addEventListener('submit', function (event) {
+			event.preventDefault();
+			window.clearTimeout(timer);
+			run();
+		});
+	});
 
 	// --- Follow the membership the form is set to ---------------------------
 	// The apartment only means anything for somebody who lives here, and

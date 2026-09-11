@@ -756,26 +756,48 @@ func TestTheNoteIsNotInTheTable(t *testing.T) {
 	}
 }
 
-// The search box filters in the browser, which is fast and right — but only
-// while the browser can see every row. Filtering the visible page and quietly
-// hiding the rest would be worse than not filtering at all.
-func TestTheBrowserOnlyFiltersWhenItCanSeeEverything(t *testing.T) {
+// The search answers as you type by asking the server again, whatever the
+// page size. The browser never does the matching itself: a register filtered
+// one way on the server and another way in the browser is how a row goes
+// missing, and the old arrangement could only filter the page you could see.
+func TestTheSearchIsLiveAtAnyPageSize(t *testing.T) {
 	h := newHarness(t)
 	for i := 0; i < 60; i++ {
 		h.member(t, fmt.Sprintf("m%02d", i), fmt.Sprintf("m%02d@example.test", i), config.KindBo)
 	}
 
-	paged := h.do(t, config.RoleBoard, "GET", "/", nil).Body.String()
-	if strings.Contains(paged, "data-table-filter") {
-		t.Error("the browser would filter only the visible page")
+	for _, target := range []string{"/", "/?antal=0", "/?antal=10"} {
+		body := h.do(t, config.RoleBoard, "GET", target, nil).Body.String()
+		if !strings.Contains(body, `data-live-search="#resultat"`) {
+			t.Errorf("%s: the form does not search as you type", target)
+		}
+		if !strings.Contains(body, `id="resultat"`) {
+			t.Errorf("%s: there is nothing for the results to be swapped into", target)
+		}
+		// The browser is not given a second opinion about matching.
+		if strings.Contains(body, "data-table-filter") {
+			t.Errorf("%s: the browser still filters rows itself", target)
+		}
 	}
-	if !strings.Contains(paged, "hela registret") {
-		t.Error("nothing tells the reader that the search covers everything")
-	}
+}
 
-	whole := h.do(t, config.RoleBoard, "GET", "/?antal=0", nil).Body.String()
-	if !strings.Contains(whole, "data-table-filter") {
-		t.Error("with every row on the page the browser should filter")
+// The server does the searching, so a search reaches rows that are not on the
+// page the reader happens to be looking at.
+func TestSearchingReachesBeyondTheCurrentPage(t *testing.T) {
+	h := newHarness(t)
+	for i := 0; i < 60; i++ {
+		h.member(t, fmt.Sprintf("m%02d", i), fmt.Sprintf("m%02d@example.test", i), config.KindBo)
+	}
+	// Somebody who would sort to the far end of a paged register.
+	h.member(t, "zz", "ozymandias@example.test", config.KindVan)
+
+	first := h.do(t, config.RoleBoard, "GET", "/?antal=10", nil).Body.String()
+	if strings.Contains(first, "ozymandias@example.test") {
+		t.Fatal("the setup is wrong: that row is already on the first page")
+	}
+	found := h.do(t, config.RoleBoard, "GET", "/?antal=10&sok=ozymandias", nil).Body.String()
+	if !strings.Contains(found, "ozymandias@example.test") {
+		t.Error("searching did not reach a row beyond the current page")
 	}
 }
 
