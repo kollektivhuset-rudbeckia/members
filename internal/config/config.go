@@ -721,8 +721,9 @@ func (c *Config) normalise() error {
 		c.Join.Reasons = []Reason{
 			{ID: "flytta-in", Name: "Jag vill flytta in", NameEN: "I would like to move in"},
 			{ID: "middagar", Name: "Gemensamma middagar", NameEN: "The shared dinners"},
+			{ID: "matlag", Name: "Matlaget", NameEN: "The cooking team"},
+			{ID: "odling", Name: "Odlingen", NameEN: "Growing things"},
 			{ID: "spelkvallar", Name: "Spelkvällar", NameEN: "Board game nights"},
-			{ID: "koren", Name: "Kören", NameEN: "The choir"},
 			{ID: "karaoke", Name: "Karaoke", NameEN: "Karaoke"},
 			{ID: "familj", Name: "Jag har familj eller vänner i huset", NameEN: "I have family or friends in the house"},
 		}

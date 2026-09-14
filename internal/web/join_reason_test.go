@@ -85,7 +85,7 @@ func TestTheFormInsistsOnAReasonItOffered(t *testing.T) {
 			http.StatusUnprocessableEntity},
 		{"something else with nothing said", filled(url.Values{"varfor": {"other"}}),
 			http.StatusUnprocessableEntity},
-		{"a real reason", filled(url.Values{"varfor": {"koren"}}), http.StatusSeeOther},
+		{"a real reason", filled(url.Values{"varfor": {"matlag"}}), http.StatusSeeOther},
 		{"something else, said", filled(url.Values{
 			"varfor": {"other"}, "varfor_annat": {"jag är nyfiken på snickarboden"},
 		}), http.StatusSeeOther},
@@ -155,23 +155,23 @@ func TestANoteIsDroppedWhenASetReasonIsPicked(t *testing.T) {
 func TestRenamingAReasonRenamesItOnTheCard(t *testing.T) {
 	h := newHarness(t)
 	if rec := h.do(t, config.RoleNone, "POST", "/bli-medlem",
-		filled(url.Values{"varfor": {"koren"}})); rec.Code != http.StatusSeeOther {
+		filled(url.Values{"varfor": {"matlag"}})); rec.Code != http.StatusSeeOther {
 		t.Fatalf("the form: got %d", rec.Code)
 	}
 
 	body := h.do(t, config.RoleIntake, "GET", "/kandidater", nil).Body.String()
-	if !strings.Contains(body, "Kören") {
+	if !strings.Contains(body, "Matlaget") {
 		t.Fatalf("the board does not show the reason:\n%s", firstLines(body, 0))
 	}
 
 	// Rename it in the configuration; the card follows.
 	for i := range h.cfg.Join.Reasons {
-		if h.cfg.Join.Reasons[i].ID == "koren" {
-			h.cfg.Join.Reasons[i].Name = "Sångkören"
+		if h.cfg.Join.Reasons[i].ID == "matlag" {
+			h.cfg.Join.Reasons[i].Name = "Matlagen"
 		}
 	}
 	body = h.do(t, config.RoleIntake, "GET", "/kandidater", nil).Body.String()
-	if !strings.Contains(body, "Sångkören") {
+	if !strings.Contains(body, "Matlagen") {
 		t.Error("the card kept the old wording after the reason was renamed")
 	}
 }
