@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 
@@ -67,8 +68,8 @@ func TestEverybodyWhoAppliesBecomesAFriendMember(t *testing.T) {
 		t.Errorf("kind: got %q, want van whatever was posted", c.Kind)
 	}
 	// Wanting to move in is recorded as a reason, which is what it is.
-	if c.Reason != "flytta-in" {
-		t.Errorf("reason: got %q", c.Reason)
+	if !slices.Equal(c.Reasons, []string{"flytta-in"}) {
+		t.Errorf("reasons: got %q", c.Reasons)
 	}
 }
 
@@ -86,6 +87,11 @@ func TestTheFormInsistsOnAReasonItOffered(t *testing.T) {
 		{"something else with nothing said", filled(url.Values{"varfor": {"other"}}),
 			http.StatusUnprocessableEntity},
 		{"a real reason", filled(url.Values{"varfor": {"matlag"}}), http.StatusSeeOther},
+		{"one offered and one not", filled(url.Values{"varfor": {"matlag", "pokerklubben"}}),
+			http.StatusUnprocessableEntity},
+		{"something else among others, with nothing said", filled(url.Values{
+			"varfor": {"matlag", "other"},
+		}), http.StatusUnprocessableEntity},
 		{"something else, said", filled(url.Values{
 			"varfor": {"other"}, "varfor_annat": {"jag är nyfiken på snickarboden"},
 		}), http.StatusSeeOther},
@@ -97,6 +103,63 @@ func TestTheFormInsistsOnAReasonItOffered(t *testing.T) {
 				t.Errorf("got %d, want %d", rec.Code, tc.want)
 			}
 		})
+	}
+}
+
+// People rarely come for one thing only, so the form takes as many reasons as
+// apply, and the card and the chat message show every one of them in the
+// order the form lists them, with their own words last.
+func TestSeveralReasonsAreKeptAndShown(t *testing.T) {
+	h := newHarness(t)
+	const said = "snickarboden"
+
+	if rec := h.do(t, config.RoleNone, "POST", "/bli-medlem", filled(url.Values{
+		"varfor": {"other", "karaoke", "middagar", "karaoke"}, "varfor_annat": {said},
+	})); rec.Code != http.StatusSeeOther {
+		t.Fatalf("the form: got %d", rec.Code)
+	}
+	c, err := h.store.OpenCandidateByEmail(context.Background(),
+		"asa@example.test", nil, h.cfg.Location())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"other", "karaoke", "middagar"}; !slices.Equal(c.Reasons, want) {
+		t.Errorf("stored %q, want %q", c.Reasons, want)
+	}
+	if c.ReasonNote != said {
+		t.Errorf("note: got %q", c.ReasonNote)
+	}
+
+	const words = "Gemensamma middagar, Karaoke, " + said
+	body := h.do(t, config.RoleIntake, "GET", "/kandidater", nil).Body.String()
+	if !strings.Contains(body, words) {
+		t.Errorf("the card does not show %q", words)
+	}
+	h.chat.waitFor(t, 1)
+	if got := h.chat.sent()[0]; !strings.Contains(got.Message, words) {
+		t.Errorf("the notification does not show %q:\n%s", words, got.Message)
+	}
+}
+
+// Coming back after an error, every box they ticked is still ticked.
+func TestTheFormKeepsEveryTickAfterAnError(t *testing.T) {
+	h := newHarness(t)
+	f := filled(url.Values{"varfor": {"matlag", "odling"}})
+	f.Del("epost")
+	rec := h.do(t, config.RoleNone, "POST", "/bli-medlem", f)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("the form: got %d", rec.Code)
+	}
+	body := rec.Body.String()
+	for _, id := range []string{"matlag", "odling"} {
+		if !strings.Contains(body, `value="`+id+`"
+					       checked`) {
+			t.Errorf("%s is no longer ticked", id)
+		}
+	}
+	if strings.Contains(body, `value="karaoke"
+					       checked`) {
+		t.Error("a box nobody ticked came back ticked")
 	}
 }
 
@@ -118,8 +181,8 @@ func TestSomethingElseKeepsTheirOwnWords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Reason != config.ReasonOther || c.ReasonNote != said {
-		t.Errorf("stored %q / %q, want %q / %q", c.Reason, c.ReasonNote, config.ReasonOther, said)
+	if !slices.Equal(c.Reasons, []string{config.ReasonOther}) || c.ReasonNote != said {
+		t.Errorf("stored %q / %q, want %q / %q", c.Reasons, c.ReasonNote, config.ReasonOther, said)
 	}
 
 	// The interview team sees the words, not the id.

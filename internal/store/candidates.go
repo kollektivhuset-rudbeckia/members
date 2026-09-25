@@ -33,10 +33,11 @@ type Candidate struct {
 	Kind      config.Kind
 	// Message is what they wrote about themselves.
 	Message string
-	// Reason is why they want to join: one of the ids in config.Join, or
-	// config.ReasonOther. Empty on candidates recorded before the form asked,
-	// which reads as "nobody asked" rather than as a reason nobody chose.
-	Reason string
+	// Reasons are why they want to join: ids from config.Join, and possibly
+	// config.ReasonOther. More than one, because people rarely come for a
+	// single thing. Empty on candidates recorded before the form asked, which
+	// reads as "nobody asked" rather than as a reason nobody chose.
+	Reasons []string
 	// ReasonNote is what they typed when no set answer fitted. It is only
 	// filled in alongside config.ReasonOther.
 	ReasonNote string
@@ -77,7 +78,7 @@ func (s *Store) CreateCandidate(ctx context.Context, c Candidate) error {
 		INSERT INTO candidates (`+candidateCols+`)
 		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.ID, c.Token, c.FirstName, c.LastName, Email(c.Email), c.Phone, c.Apartment,
-		string(c.Kind), c.Message, c.Reason, c.ReasonNote,
+		string(c.Kind), c.Message, joinReasons(c.Reasons), c.ReasonNote,
 		c.Stage, c.Responsible, dayOrNil(c.InterviewOn),
 		c.Note, c.Source, c.MemberID,
 		utc(c.CreatedAt), c.CreatedIP, utc(c.MovedAt), c.MovedBy)
@@ -92,7 +93,7 @@ func (s *Store) UpdateCandidate(ctx context.Context, c Candidate) error {
 			interview_on=?, note=?, member_id=?, moved_at=?, moved_by=?
 		WHERE id=?`,
 		c.FirstName, c.LastName, Email(c.Email), c.Phone, c.Apartment,
-		string(c.Kind), c.Message, c.Reason, c.ReasonNote,
+		string(c.Kind), c.Message, joinReasons(c.Reasons), c.ReasonNote,
 		c.Stage, c.Responsible, dayOrNil(c.InterviewOn),
 		c.Note, c.MemberID, utc(c.MovedAt), c.MovedBy, c.ID)
 	if err != nil {
@@ -293,16 +294,17 @@ func dayOrNil(t sql.NullTime) any {
 
 func scanCandidate(row interface{ Scan(...any) error }, loc *time.Location) (Candidate, error) {
 	var c Candidate
-	var kind, created, moved string
+	var kind, reasons, created, moved string
 	var interview sql.NullString
 	err := row.Scan(&c.ID, &c.Token, &c.FirstName, &c.LastName, &c.Email, &c.Phone,
-		&c.Apartment, &kind, &c.Message, &c.Reason, &c.ReasonNote,
+		&c.Apartment, &kind, &c.Message, &reasons, &c.ReasonNote,
 		&c.Stage, &c.Responsible, &interview,
 		&c.Note, &c.Source, &c.MemberID, &created, &c.CreatedIP, &moved, &c.MovedBy)
 	if err != nil {
 		return c, err
 	}
 	c.Kind = mustKind(kind)
+	c.Reasons = splitReasons(reasons)
 	if interview.Valid && strings.TrimSpace(interview.String) != "" {
 		t, err := ParseDay(interview.String, loc)
 		if err != nil {
@@ -317,4 +319,20 @@ func scanCandidate(row interface{ Scan(...any) error }, loc *time.Location) (Can
 		return c, err
 	}
 	return c, nil
+}
+
+// joinReasons and splitReasons keep the list in the one reason column, comma
+// separated. A row from when the form took a single answer is a list of one,
+// so nothing written before needs rewriting. Ids cannot contain a comma:
+// config refuses them.
+func joinReasons(ids []string) string { return strings.Join(ids, ",") }
+
+func splitReasons(s string) []string {
+	var out []string
+	for _, id := range strings.Split(s, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			out = append(out, id)
+		}
+	}
+	return out
 }

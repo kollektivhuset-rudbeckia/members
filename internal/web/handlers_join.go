@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -73,20 +74,20 @@ type joinForm struct {
 	LastName  string
 	Email     string
 	Phone     string
-	// Reason is why they want to join, and ReasonNote is what they typed when
-	// none of the set answers fitted. There is deliberately no Kind: the form
+	// Reasons are why they want to join — as many as apply — and ReasonNote
+	// is what they typed when none of the set answers fitted. There is deliberately no Kind: the form
 	// used to ask which membership somebody was after, and bomedlem was one
 	// of the answers — which invited people to apply for something nobody
 	// could grant them. Everybody who applies becomes a vänmedlem.
-	Reason     string
+	Reasons    []string
 	ReasonNote string
 	Message    string
 	Errors     map[string]string
 }
 
-// Chose reports whether this reason is the one picked, so the form can come
-// back with the person's own answer still selected after an error.
-func (f joinForm) Chose(id string) bool { return f.Reason == id }
+// Chose reports whether this reason is among those picked, so the form can
+// come back with the person's own answers still ticked after an error.
+func (f joinForm) Chose(id string) bool { return slices.Contains(f.Reasons, id) }
 
 func (f joinForm) Bad() bool               { return len(f.Errors) > 0 }
 func (f joinForm) Err(field string) string { return f.Errors[field] }
@@ -97,10 +98,22 @@ func readJoinForm(r *http.Request) joinForm {
 		LastName:   strings.TrimSpace(r.FormValue("efternamn")),
 		Email:      store.Email(r.FormValue("epost")),
 		Phone:      strings.TrimSpace(r.FormValue("telefon")),
-		Reason:     strings.TrimSpace(r.FormValue("varfor")),
+		Reasons:    readReasons(r.Form["varfor"]),
 		ReasonNote: strings.TrimSpace(r.FormValue("varfor_annat")),
 		Message:    strings.TrimSpace(r.FormValue("meddelande")),
 	}
+}
+
+// readReasons tidies the ticked boxes: blanks dropped, each id once, in the
+// order they were sent.
+func readReasons(values []string) []string {
+	var out []string
+	for _, v := range values {
+		if v = strings.TrimSpace(v); v != "" && !slices.Contains(out, v) {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // validate checks the form the way a person would: is there a name, does the
@@ -116,15 +129,16 @@ func (f *joinForm) validate(join config.Join) bool {
 	case !emailShape.MatchString(f.Email):
 		f.Errors["email"] = "form.err.email.shape"
 	}
-	// The reason is the point of asking, so it is required — but only from
-	// among the answers the form actually offered, so that a hand-made
-	// request cannot record a reason nobody could have chosen.
+	// A reason is the point of asking, so at least one is required — but
+	// only from among the answers the form actually offered, so that a
+	// hand-made request cannot record a reason nobody could have chosen.
+	other := slices.Contains(f.Reasons, config.ReasonOther)
 	switch {
-	case f.Reason == "":
+	case len(f.Reasons) == 0:
 		f.Errors["reason"] = "join.err.reason"
-	case !join.Offers(f.Reason):
+	case slices.ContainsFunc(f.Reasons, func(id string) bool { return !join.Offers(id) }):
 		f.Errors["reason"] = "join.err.reason"
-	case f.Reason == config.ReasonOther && f.ReasonNote == "":
+	case other && f.ReasonNote == "":
 		// Picking "something else" and saying nothing tells the interview
 		// team less than picking nothing at all would.
 		f.Errors["reason_note"] = "join.err.reason.other"
@@ -132,7 +146,7 @@ func (f *joinForm) validate(join config.Join) bool {
 	if len([]rune(f.ReasonNote)) > 500 {
 		f.Errors["reason_note"] = "join.err.long"
 	}
-	if f.Reason != config.ReasonOther {
+	if !other {
 		// A note typed before changing one's mind is not an answer.
 		f.ReasonNote = ""
 	}
@@ -246,7 +260,7 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 		// recorded as a reason, which is what it actually is.
 		Kind:    config.KindVan,
 		Message: f.Message,
-		Reason:  f.Reason, ReasonNote: f.ReasonNote,
+		Reasons: f.Reasons, ReasonNote: f.ReasonNote,
 		Stage:     s.cfg.Pipeline.EntryStage(),
 		Source:    store.SourceForm,
 		CreatedAt: now, CreatedIP: ip, MovedAt: now,
@@ -257,7 +271,7 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("somebody would like to join", "name", c.Name(), "email", c.Email,
-		"reason", c.Reason)
+		"reasons", c.Reasons)
 	// Tell the interview team now, not at the next sync. Somebody who fills
 	// in this form and hears nothing is the worst thing the register can do
 	// to a person, and a channel message is how a human gets to them today.
@@ -317,7 +331,8 @@ func (s *Server) handleJoinThanks(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusOK, "thanks.html", v)
 }
 
-// reasonWords is why somebody applied, in words, for a page or a chat message.
+// reasonWords is why somebody applied, in words, for a page or a chat message:
+// each reason they ticked, in the order the form lists them, comma separated.
 //
 // It resolves the stored id through the configuration rather than storing the
 // label, so that renaming a reason renames it everywhere instead of leaving
@@ -325,19 +340,27 @@ func (s *Server) handleJoinThanks(w http.ResponseWriter, r *http.Request) {
 // form asked has no reason and gets no words, which reads as "nobody asked"
 // rather than as a reason nobody chose.
 func (s *Server) reasonWords(c store.Candidate, lang string) string {
-	switch {
-	case c.Reason == "":
-		return ""
-	case c.Reason == config.ReasonOther:
-		if note := strings.TrimSpace(c.ReasonNote); note != "" {
-			return note
+	var words []string
+	for _, r := range s.cfg.Join.Reasons {
+		if slices.Contains(c.Reasons, r.ID) {
+			words = append(words, r.NameFor(lang))
 		}
-		return i18n.T(i18n.Lang(lang), "join.why.other")
 	}
-	if r, ok := s.cfg.Join.Reason(c.Reason); ok {
-		return r.NameFor(lang)
+	for _, id := range c.Reasons {
+		if _, ok := s.cfg.Join.Reason(id); ok || id == config.ReasonOther {
+			continue
+		}
+		// A reason that has since been taken out of the configuration. Show
+		// the id rather than nothing, so the answer does not silently vanish.
+		words = append(words, id)
 	}
-	// A reason that has since been taken out of the configuration. Show the
-	// id rather than nothing, so the row does not silently empty out.
-	return c.Reason
+	// Their own words last, the way the form lists "something else".
+	if slices.Contains(c.Reasons, config.ReasonOther) {
+		if note := strings.TrimSpace(c.ReasonNote); note != "" {
+			words = append(words, note)
+		} else {
+			words = append(words, i18n.T(i18n.Lang(lang), "join.why.other"))
+		}
+	}
+	return strings.Join(words, ", ")
 }

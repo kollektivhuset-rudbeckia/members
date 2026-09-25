@@ -737,6 +737,10 @@ func (c *Config) normalise() error {
 		if r.ID == "" {
 			return fmt.Errorf("join.reasons has an entry with no id")
 		}
+		if strings.Contains(r.ID, ",") {
+			// A candidate's reasons are kept comma separated in one column.
+			return fmt.Errorf("join reason %q has a comma in its id", r.ID)
+		}
 		if r.ID == ReasonOther {
 			return fmt.Errorf("join.reasons may not define %q: it is always offered last and asks the person to say what they are after", ReasonOther)
 		}

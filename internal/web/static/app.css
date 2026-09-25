@@ -742,8 +742,9 @@ textarea:hover { border-color: var(--base-300); }
 }
 .proposal-noreason { margin: .9rem 0 0; }
 
-/* The reasons somebody gives for joining. Radio buttons rather than a menu:
-   a handful of short answers read faster at a glance than they open. */
+/* The reasons somebody gives for joining. Checkboxes rather than a menu:
+   a handful of short answers read faster at a glance than they open, and
+   more than one of them usually applies. */
 .reasons { border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.15rem; }
 .reasons legend { padding: 0 .4rem; font-weight: 500; }
 .reasons .hint { display: block; margin: 0 0 .7rem; }

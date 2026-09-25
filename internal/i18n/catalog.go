@@ -499,12 +499,12 @@ var catalog = map[string]entry{
 
 	"join.why":            {"Varför vill du bli vänmedlem?", "Why would you like to be a friend member?"},
 	"join.why.short":      {"Varför", "Why"},
-	"join.why.hint":       {"Välj det som stämmer bäst. Det är inget bindande — det hjälpar oss att veta vad vi ska berätta om.", "Pick whichever fits best. Nothing is binding — it helps us know what to tell you about."},
+	"join.why.hint":       {"Kryssa i så många som stämmer. Det är inget bindande — det hjälper oss att veta vad vi ska berätta om.", "Tick as many as fit. Nothing is binding — it helps us know what to tell you about."},
 	"join.why.other":      {"Något annat", "Something else"},
 	"join.why.other.what": {"Vad är du nyfiken på?", "What are you after?"},
 	"join.why.other.hint": {"Skriv med egna ord", "In your own words"},
 
-	"join.err.reason":       {"Välj ett skäl, så vet vi vad vi ska berätta om.", "Pick a reason, so we know what to tell you about."},
+	"join.err.reason":       {"Kryssa i minst ett skäl, så vet vi vad vi ska berätta om.", "Tick at least one, so we know what to tell you about."},
 	"join.err.reason.other": {"Skriv några ord om vad du är nyfiken på.", "Write a few words about what you are after."},
 
 	"join.cost":      {"Vad det kostar", "What it costs"},

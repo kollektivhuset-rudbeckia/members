@@ -74,22 +74,22 @@
 				<input id="telefon" name="telefon" type="tel" value="{{$f.Phone}}"
 				       autocomplete="tel" maxlength="200">
 			</div>
-			{{/* Radio buttons rather than a menu: seven short answers are
-			     quicker to read at a glance than to open, and the last one
-			     reveals a text field, which a menu cannot do without
-			     JavaScript. */}}
+			{{/* Checkboxes, because people rarely come for one thing only:
+			     somebody moving in may also want the dinners and the cooking
+			     team, and the interview team wants to hear all of it. The
+			     last one reveals a text field. */}}
 			<fieldset class="field field-wide reasons">
 				<legend>{{t "join.why"}}</legend>
 				<small class="hint">{{t "join.why.hint"}}</small>
 				{{range $d.Reasons}}
 				<label class="choice">
-					<input type="radio" name="varfor" value="{{.ID}}"
+					<input type="checkbox" name="varfor" value="{{.ID}}"
 					       {{if $f.Chose .ID}}checked{{end}}>
 					<span>{{.NameFor (printf "%s" $.Lang)}}</span>
 				</label>
 				{{end}}
 				<label class="choice">
-					<input type="radio" name="varfor" value="{{$d.Other}}"
+					<input type="checkbox" name="varfor" value="{{$d.Other}}"
 					       {{if $f.Chose $d.Other}}checked{{end}} data-reveals="#varfor-annat">
 					<span>{{t "join.why.other"}}</span>
 				</label>

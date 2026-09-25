@@ -40,13 +40,10 @@
 		if (!reveal) { return; }
 		var box = document.querySelector(reveal.getAttribute('data-reveals'));
 		if (!box) { return; }
-		var group = document.getElementsByName(reveal.name);
 		var sync = function () {
 			box.hidden = !reveal.checked;
 		};
-		for (var i = 0; i < group.length; i++) {
-			group[i].addEventListener('change', sync);
-		}
+		reveal.addEventListener('change', sync);
 		sync();
 	})();
 
