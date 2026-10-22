@@ -8,6 +8,22 @@
 	<p class="lede">{{t "join.thanks.plain"}}</p>
 </header>
 <p><a class="button" href="/bli-medlem">{{t "join.thanks.back"}}</a></p>
+{{else if not $d.Joins}}
+{{$a := $d.Candidate}}
+{{/* Curious, not joining. No fee and no payment details: they asked to hear
+     more, and somebody from the house will ring or write. */}}
+<header class="hero">
+	<h1>{{t "join.thanks.hi" $a.FirstName}}</h1>
+	<p class="lede">{{t "join.curious.lede" $d.Contact}}</p>
+</header>
+
+<section class="panel">
+	<h2>{{t "join.thanks.next"}}</h2>
+	<p>{{t "join.curious.next"}}</p>
+	<p class="hint">{{t "join.curious.member" $d.Contact}}</p>
+</section>
+
+{{template "thanks_said" .}}
 {{else}}
 {{$a := $d.Candidate}}{{$p := $d.Pay}}
 
@@ -64,6 +80,16 @@
 	</div>
 </section>
 
+{{template "thanks_said" .}}
+{{end}}
+
+</div>
+{{end}}
+{{template "base" .}}
+
+{{/* What they sent, on both versions of the page. */}}
+{{define "thanks_said"}}
+{{$d := .Data}}{{$a := $d.Candidate}}
 <section class="panel">
 	<h2>{{t "join.thanks.said"}}</h2>
 	<dl class="facts-list">
@@ -76,7 +102,3 @@
 	<p class="hint">{{t "join.thanks.keep"}}</p>
 </section>
 {{end}}
-
-</div>
-{{end}}
-{{template "base" .}}

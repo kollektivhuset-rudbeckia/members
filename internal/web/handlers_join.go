@@ -312,6 +312,22 @@ func (s *Server) handleJoinThanks(w http.ResponseWriter, r *http.Request) {
 		s.errorPage(w, r, http.StatusNotFound, "join.thanks.gone", "join.thanks.gone.how")
 		return
 	}
+	joins := s.wantsToJoin(a)
+	data := map[string]any{
+		"Known":     true,
+		"Candidate": a,
+		"Contact":   s.rt.AccountFor(config.RoleIntake),
+		"Reason":    s.reasonWords(a, string(v.Lang)),
+		"Joins":     joins,
+	}
+	v.Data = data
+	if !joins {
+		// Curious, not joining: a thank-you and a promise that somebody will
+		// be in touch. Asking for a fee here would turn "tell me more" into a
+		// bill.
+		s.render(w, r, http.StatusOK, "thanks.html", v)
+		return
+	}
 	ways, err := payment.For(s.cfg.Membership, a.Kind, v.Now.Year(), a.Name())
 	if err != nil {
 		// A QR code that will not encode must not lose somebody the bankgiro.
@@ -321,14 +337,16 @@ func (s *Server) handleJoinThanks(w http.ResponseWriter, r *http.Request) {
 			Reference: s.cfg.Membership.Reference(a.Name()), Bankgiro: s.cfg.Membership.Bankgiro,
 		}
 	}
-	v.Data = map[string]any{
-		"Known":     true,
-		"Candidate": a,
-		"Pay":       ways,
-		"Contact":   s.rt.AccountFor(config.RoleIntake),
-		"Reason":    s.reasonWords(a, string(v.Lang)),
-	}
+	data["Pay"] = ways
 	s.render(w, r, http.StatusOK, "thanks.html", v)
+}
+
+// wantsToJoin is whether the page after the form should ask for the fee:
+// somebody picked a reason that means becoming a member. A candidate from
+// before the form asked why has no reasons, and signed up on a page that was
+// only about membership, so they keep the page they were shown then.
+func (s *Server) wantsToJoin(c store.Candidate) bool {
+	return len(c.Reasons) == 0 || s.cfg.Join.Joins(c.Reasons)
 }
 
 // reasonWords is why somebody applied, in words, for a page or a chat message:

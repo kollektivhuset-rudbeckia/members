@@ -404,6 +404,11 @@ func cleanAddresses(in []string) []string {
 // What is asked instead is why — and the reasons are configuration rather
 // than code, because they are this house's own life. A house with a
 // woodworking shop and no choir should not need a release to say so.
+//
+// The page is for the curious, not only for those who have already decided.
+// Becoming a vänmedlem is one of the reasons, and only somebody who picks it
+// — or a reason that needs it, like wanting to move in — is asked to pay.
+// Everybody else is thanked and told somebody will get in touch.
 type Join struct {
 	Reasons []Reason `yaml:"reasons"`
 }
@@ -413,6 +418,10 @@ type Reason struct {
 	ID     string `yaml:"id"`
 	Name   string `yaml:"name"`
 	NameEN string `yaml:"name_en"`
+	// Joins marks a reason that means becoming a member, so the page after
+	// the form asks for the fee instead of only saying thank you. Moving in
+	// is one: the queue points that lead to a flat come from membership.
+	Joins bool `yaml:"joins"`
 }
 
 // NameFor gives the reason's words in one language.
@@ -433,6 +442,18 @@ func (j Join) Reason(id string) (Reason, bool) {
 		}
 	}
 	return Reason{}, false
+}
+
+// Joins reports whether any of these reasons means becoming a member. It is
+// read from the configuration when the page is shown rather than stored, the
+// same way the words are.
+func (j Join) Joins(ids []string) bool {
+	for _, id := range ids {
+		if r, ok := j.Reason(id); ok && r.Joins {
+			return true
+		}
+	}
+	return false
 }
 
 // Offers reports whether an id is an answer the form actually offered, so a
@@ -719,7 +740,8 @@ func (c *Config) normalise() error {
 		// defaults in code so a fresh deployment works, and a house that
 		// wants different ones says so in the file rather than in a release.
 		c.Join.Reasons = []Reason{
-			{ID: "flytta-in", Name: "Jag vill flytta in", NameEN: "I would like to move in"},
+			{ID: "vanmedlem", Name: "Jag vill bli vänmedlem", NameEN: "I would like to become a friend member", Joins: true},
+			{ID: "flytta-in", Name: "Jag vill flytta in", NameEN: "I would like to move in", Joins: true},
 			{ID: "middagar", Name: "Gemensamma middagar", NameEN: "The shared dinners"},
 			{ID: "matlag", Name: "Matlaget", NameEN: "The cooking team"},
 			{ID: "odling", Name: "Odlingen", NameEN: "Growing things"},

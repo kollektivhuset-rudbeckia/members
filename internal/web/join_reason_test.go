@@ -262,3 +262,54 @@ func firstLines(s string, n int) string {
 	}
 	return strings.Join(lines[:n], "\n")
 }
+
+// thanksFor sends the form with these reasons and returns the page it leads to.
+func thanksFor(t *testing.T, h *harness, reasons ...string) string {
+	t.Helper()
+	rec := h.do(t, config.RoleNone, "POST", "/bli-medlem", filled(url.Values{"varfor": reasons}))
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("the form: got %d", rec.Code)
+	}
+	return h.do(t, config.RoleNone, "GET", rec.Header().Get("Location"), nil).Body.String()
+}
+
+// The page is for the curious. Only somebody who said they want to become a
+// member, or to move in, is shown the fee; everybody else is thanked and told
+// somebody will be in touch.
+func TestOnlyThoseWhoWantToJoinAreAskedToPay(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		reasons []string
+		pay     bool
+	}{
+		{"curious about the dinners", []string{"middagar", "karaoke"}, false},
+		{"a friend member", []string{"vanmedlem"}, true},
+		{"moving in", []string{"flytta-in"}, true},
+		{"curious, and a friend member too", []string{"odling", "vanmedlem"}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+			body := thanksFor(t, h, tc.reasons...)
+			if got := strings.Contains(body, "Betala årsavgiften"); got != tc.pay {
+				t.Errorf("asked to pay: got %v, want %v", got, tc.pay)
+			}
+			if got := strings.Contains(body, "Tack för ditt intresse"); got == tc.pay {
+				t.Errorf("thanked for the interest: got %v, want %v", got, !tc.pay)
+			}
+		})
+	}
+}
+
+// Which reasons mean joining is the house's to say, like the reasons
+// themselves.
+func TestWhichReasonsMeanJoiningIsConfiguration(t *testing.T) {
+	h := newHarness(t)
+	for i := range h.cfg.Join.Reasons {
+		if h.cfg.Join.Reasons[i].ID == "matlag" {
+			h.cfg.Join.Reasons[i].Joins = true
+		}
+	}
+	if body := thanksFor(t, h, "matlag"); !strings.Contains(body, "Betala årsavgiften") {
+		t.Error("a reason configured to mean joining did not lead to the fee")
+	}
+}

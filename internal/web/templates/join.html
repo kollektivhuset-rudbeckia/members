@@ -11,12 +11,15 @@
 	<h2>{{t "join.what"}}</h2>
 	<ul class="benefits">
 		<li><strong>{{t "join.what.dinner"}}</strong><span>{{t "join.what.dinner.body"}}</span></li>
-		<li><strong>{{t "join.what.queue"}}</strong><span>{{t "join.what.queue.body"}}</span></li>
 		<li><strong>{{t "join.what.house"}}</strong><span>{{t "join.what.house.body"}}</span></li>
+		<li><strong>{{t "join.what.queue"}}</strong><span>{{t "join.what.queue.body"}}</span></li>
 	</ul>
 	<p class="hint">{{t "join.what.more" .Site.HomeURL}}</p>
 </section>
 
+{{/* Membership is one answer among several, not the point of the page: you
+     can turn up to a game night or a cooking team without joining. What
+     membership adds is that the house's news reaches you, and the queue. */}}
 <section class="panel">
 	<h2>{{t "join.kinds"}}</h2>
 	<p>{{t "join.kinds.lede"}}</p>
@@ -24,10 +27,6 @@
 		<div><dt>{{t "kind.van"}}</dt><dd>{{t "join.kind.van"}}</dd></div>
 		<div><dt>{{t "kind.bo"}}</dt><dd>{{t "join.kind.bo"}}</dd></div>
 	</dl>
-</section>
-
-<section class="panel">
-	<h2>{{t "join.cost"}}</h2>
 	<p class="price"><strong>{{money $d.Fee}}</strong> <span>{{t "join.cost.year" $d.Year}}</span></p>
 	{{if $d.FeeChanges}}<p class="hint">{{t "join.cost.next" $d.NextYear (money $d.FeeNext)}}</p>{{end}}
 	<p class="hint">{{t "join.cost.when"}}</p>
@@ -76,8 +75,9 @@
 			</div>
 			{{/* Checkboxes, because people rarely come for one thing only:
 			     somebody moving in may also want the dinners and the cooking
-			     team, and the interview team wants to hear all of it. The
-			     last one reveals a text field. */}}
+			     team, and the interview team wants to hear all of it. Ticking
+			     a reason that means joining is what makes the next page ask
+			     for the fee. The last one reveals a text field. */}}
 			<fieldset class="field field-wide reasons">
 				<legend>{{t "join.why"}}</legend>
 				<small class="hint">{{t "join.why.hint"}}</small>
