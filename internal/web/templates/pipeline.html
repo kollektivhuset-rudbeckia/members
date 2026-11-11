@@ -22,7 +22,12 @@
 	</div>
 </div>
 
-<div class="board" {{if $edit}}data-board{{end}}>
+<div class="board" {{if $edit}}data-board
+     data-msg-hint="{{t "pipeline.note.hint"}}"
+     data-msg-failed="{{t "pipeline.note.failed"}}"
+     data-msg-signedout="{{t "pipeline.note.signedout"}}"
+     data-msg-draft="{{t "pipeline.note.draft"}}"
+     data-msg-discard="{{t "pipeline.note.discard"}}"{{end}}>
 	{{range .Data.Columns}}
 	<section class="lane {{if .Stage.Closed}}is-closed{{end}}" data-lane="{{.Stage.ID}}">
 		<header class="lane-head">
@@ -67,7 +72,7 @@
 					<div><dt>{{t "form.phone"}}</dt>
 						<dd {{if $edit}}data-edit="telefon" data-id="{{$c.ID}}" data-type="tel"{{end}}>{{with $c.Phone}}{{.}}{{else}}—{{end}}</dd></div>
 					<div><dt>{{t "form.note"}}</dt>
-						<dd {{if $edit}}data-edit="anteckning" data-id="{{$c.ID}}"{{end}}>{{with $c.Note}}{{.}}{{else}}—{{end}}</dd></div>
+						<dd class="card-note" {{if $edit}}data-edit="anteckning" data-id="{{$c.ID}}" data-type="multiline" data-max="5000" data-label="{{t "form.note"}}"{{end}}>{{with $c.Note}}{{.}}{{else}}—{{end}}</dd></div>
 					{{/* What the applicant said themselves, so not editable:
 					     correcting somebody's own answer would lose it. */}}
 					{{with .Reason}}<div><dt>{{t "join.why.short"}}</dt><dd>{{.}}</dd></div>{{end}}

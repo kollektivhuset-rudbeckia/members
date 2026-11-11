@@ -156,6 +156,10 @@
 		if (!root || !window.fetch) { return; }
 
 		// Ask the server to change one field, and say whether it took.
+		//
+		// Redirects are not followed: a session that has run out answers
+		// with a redirect to the sign-in page, and following it would come
+		// back 200 with the sign-in page and look exactly like a save.
 		var save = function (id, field, value) {
 			var body = new URLSearchParams();
 			body.set('falt', field);
@@ -164,11 +168,52 @@
 			return fetch('/kandidater/' + encodeURIComponent(id) + '/falt', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-				body: body.toString()
+				body: body.toString(),
+				redirect: 'manual',
+				credentials: 'same-origin'
 			}).then(function (r) {
+				if (r.type === 'opaqueredirect' || r.status === 0 || (r.status >= 300 && r.status < 400)) {
+					var e = new Error('signed out'); e.signedOut = true; throw e;
+				}
 				if (!r.ok) { throw new Error('status ' + r.status); }
 			});
 		};
+
+		var msg = function (name) { return root.getAttribute('data-msg-' + name) || ''; };
+
+		// --- Drafts --------------------------------------------------------
+		// Whatever is typed into a long field is kept in this browser until
+		// the server has it, so a failed save, a closed tab or an expired
+		// session never costs anybody an interview's worth of notes.
+		var draftKey = function (id, field) { return 'utkast:kandidat:' + id + ':' + field; };
+		var draft = {
+			get: function (id, field) {
+				try { return window.localStorage.getItem(draftKey(id, field)); } catch (e) { return null; }
+			},
+			set: function (id, field, text) {
+				try { window.localStorage.setItem(draftKey(id, field), text); } catch (e) { /* nothing to do */ }
+			},
+			drop: function (id, field) {
+				try { window.localStorage.removeItem(draftKey(id, field)); } catch (e) { /* nothing to do */ }
+			}
+		};
+		var storedText = function (cell) {
+			var raw = cell.getAttribute('data-raw');
+			if (raw !== null) { return raw; }
+			var shown = cell.textContent.trim();
+			return shown === '—' ? '' : shown;
+		};
+		// Point out drafts left over from last time, so they are found.
+		root.querySelectorAll('[data-type="multiline"]').forEach(function (cell) {
+			var kept = draft.get(cell.getAttribute('data-id'), cell.getAttribute('data-edit'));
+			if (kept === null) { return; }
+			if (kept.trim() === storedText(cell)) {
+				draft.drop(cell.getAttribute('data-id'), cell.getAttribute('data-edit'));
+				return;
+			}
+			cell.classList.add('has-draft');
+			cell.setAttribute('data-draft-label', msg('draft'));
+		});
 
 		var counts = function () {
 			root.querySelectorAll('[data-lane]').forEach(function (lane) {
@@ -183,52 +228,118 @@
 		// number is what this replaces.
 		var editing = null;
 		root.addEventListener('click', function (event) {
+			if (event.target.closest('.inline-status a')) { return; }
 			var cell = event.target.closest('[data-edit]');
-			if (!cell || cell === editing || cell.querySelector('input')) { return; }
+			if (!cell || cell === editing || cell.querySelector('input, textarea')) { return; }
 			if (editing) { return; }
 
 			var field = cell.getAttribute('data-edit');
 			var id = cell.getAttribute('data-id');
-			var shown = cell.textContent.trim();
-			var raw = cell.getAttribute('data-raw');
-			var before = raw !== null ? raw : (shown === '—' ? '' : shown);
+			var type = cell.getAttribute('data-type') || 'text';
+			var multiline = type === 'multiline';
+			var before = storedText(cell);
 
-			var input = document.createElement('input');
-			input.type = cell.getAttribute('data-type') || 'text';
-			input.value = before;
+			var input;
+			if (multiline) {
+				input = document.createElement('textarea');
+				input.rows = 4;
+				var kept = draft.get(id, field);
+				input.value = kept !== null ? kept : before;
+			} else {
+				input = document.createElement('input');
+				input.type = type;
+				input.value = before;
+			}
+			var max = cell.getAttribute('data-max');
+			if (max) { input.maxLength = parseInt(max, 10); }
 			input.className = 'inline-input';
 			input.setAttribute('aria-label', cell.getAttribute('data-label') || field);
 
+			// A long text is written below its label, across the whole card,
+			// with a line saying how it is saved and room for an error.
+			var row = cell.parentElement;
+			var status = null;
 			editing = cell;
+			cell.classList.remove('has-draft');
 			cell.textContent = '';
 			cell.appendChild(input);
+			if (multiline) {
+				row.classList.add('is-writing');
+				status = document.createElement('small');
+				status.className = 'inline-status';
+				status.textContent = msg('hint');
+				cell.appendChild(status);
+			}
+			var grow = function () {
+				if (!multiline) { return; }
+				input.style.height = 'auto';
+				input.style.height = (input.scrollHeight + 2) + 'px';
+			};
+			grow();
 			input.focus();
-			input.select();
+			if (multiline) {
+				input.setSelectionRange(input.value.length, input.value.length);
+			} else {
+				input.select();
+			}
 
-			var done = false;
-			var finish = function (keep) {
-				if (done) { return; }
-				done = true;
+			input.addEventListener('input', function () {
+				grow();
+				if (multiline) { draft.set(id, field, input.value); }
+			});
+
+			var busy = false;
+			var close = function (text) {
 				editing = null;
+				row.classList.remove('is-writing');
+				cell.textContent = text === '' ? '—' : text;
+			};
+			var finish = function (keep) {
+				if (busy || editing !== cell) { return; }
 				var value = keep ? input.value.trim() : before;
-				var show = function (text) { cell.textContent = text === '' ? '—' : text; };
 
-				if (!keep || value === before) { show(before); return; }
+				if (!keep || value === before) {
+					if (multiline) { draft.drop(id, field); }
+					close(before);
+					return;
+				}
 
+				busy = true;
+				cell.classList.remove('is-failed');
 				cell.classList.add('is-saving');
 				save(id, field, value).then(function () {
+					busy = false;
+					if (multiline) { draft.drop(id, field); }
 					// The card is dragged and read, not re-rendered, so the
 					// displayed form of a date is worked out here rather than
 					// asking the server for the whole page again.
 					if (cell.hasAttribute('data-raw')) { cell.setAttribute('data-raw', value); }
-					show(value);
+					before = value;
+					close(value);
 					cell.classList.remove('is-saving');
 					cell.classList.add('is-saved');
 					setTimeout(function () { cell.classList.remove('is-saved'); }, 1200);
-				}).catch(function () {
-					show(before);
+				}).catch(function (err) {
+					busy = false;
 					cell.classList.remove('is-saving');
 					cell.classList.add('is-failed');
+					if (multiline) {
+						// Keep the editor open with the text in it. Throwing
+						// away what somebody wrote because the network
+						// hiccuped is the one thing this must never do.
+						draft.set(id, field, input.value);
+						status.textContent = err && err.signedOut ? msg('signedout') : msg('failed');
+						if (err && err.signedOut) {
+							var link = document.createElement('a');
+							link.href = '/login';
+							link.target = '_blank';
+							link.rel = 'noopener';
+							link.textContent = ' → /login';
+							status.appendChild(link);
+						}
+						return;
+					}
+					close(before);
 					// A change that did not save must not look as though it
 					// did; reload so the card shows what is actually stored.
 					setTimeout(function () { window.location.reload(); }, 900);
@@ -237,8 +348,14 @@
 
 			input.addEventListener('blur', function () { finish(true); });
 			input.addEventListener('keydown', function (e) {
-				if (e.key === 'Enter') { e.preventDefault(); finish(true); }
-				if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+				if (e.key === 'Enter' && (!multiline || e.ctrlKey || e.metaKey)) {
+					e.preventDefault(); finish(true);
+				}
+				if (e.key === 'Escape') {
+					e.preventDefault();
+					if (multiline && input.value.trim() !== before && !window.confirm(msg('discard'))) { return; }
+					finish(false);
+				}
 			});
 		});
 

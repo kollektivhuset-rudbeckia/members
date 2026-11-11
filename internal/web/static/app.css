@@ -842,6 +842,23 @@ textarea:hover { border-color: var(--base-300); }
 	padding: .1rem .25rem; border: 1px solid var(--accent); border-radius: 3px;
 	background: var(--bg); color: var(--text);
 }
+/* The note is where an interview gets written up, so it keeps its line
+   breaks, and while it is being written it gets the whole card's width
+   below its label instead of a sliver beside it. */
+.card-note { white-space: pre-wrap; }
+.card-fields > div.is-writing { flex-direction: column; align-items: stretch; gap: .2rem; }
+.card-fields > div.is-writing dt { flex: none; }
+textarea.inline-input {
+	display: block; min-height: 7rem; max-height: 60vh; padding: .4rem .5rem;
+	line-height: 1.45; resize: vertical; white-space: pre-wrap; overflow-y: auto;
+}
+.inline-status { display: block; margin-top: .25rem; font-size: .72rem; color: var(--text-faint); white-space: normal; }
+[data-edit].is-failed .inline-status { color: var(--danger-text); }
+[data-edit].is-failed:has(textarea) { background: none; }
+[data-edit].has-draft::after {
+	content: attr(data-draft-label); display: block; margin-top: .15rem;
+	font-size: .72rem; color: var(--danger-text); white-space: normal;
+}
 .card-said {
 	margin: .5rem 0 0; padding: .35rem .5rem; font-size: .8rem; font-style: italic;
 	color: var(--text-muted); background: var(--bg-sunk); border-radius: var(--radius-sm);

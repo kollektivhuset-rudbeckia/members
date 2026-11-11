@@ -243,3 +243,35 @@ func TestClearCandidateStageReturnsWhatItRemoved(t *testing.T) {
 		t.Errorf("returned %d cards from an empty stage", len(gone))
 	}
 }
+
+// The note is where an interview gets written up. It keeps its paragraphs and
+// has room for them; a name or a telephone number does not need that room.
+func TestTheNoteHoldsAWholeInterview(t *testing.T) {
+	h := newHarness(t)
+	id := h.candidate(t, "Per", "per@example.test", "new")
+
+	long := strings.Repeat("Vi åt middag tillsammans och pratade länge.\n\n", 40) // ~1900 tecken
+	rec := h.do(t, config.RoleIntake, "POST", "/kandidater/"+id+"/falt",
+		url.Values{"falt": {"anteckning"}, "varde": {long}, "tyst": {"1"}})
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("saving a long note: got %d, want 204", rec.Code)
+	}
+	c, err := h.store.Candidate(context.Background(), id, h.cfg.Location())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Note != strings.TrimSpace(long) {
+		t.Errorf("the note came back changed: %d runes, want %d", len([]rune(c.Note)), len([]rune(strings.TrimSpace(long))))
+	}
+
+	rec = h.do(t, config.RoleIntake, "POST", "/kandidater/"+id+"/falt",
+		url.Values{"falt": {"anteckning"}, "varde": {strings.Repeat("x", noteLimit+1)}, "tyst": {"1"}})
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("a note over the limit: got %d, want 413", rec.Code)
+	}
+	rec = h.do(t, config.RoleIntake, "POST", "/kandidater/"+id+"/falt",
+		url.Values{"falt": {"telefon"}, "varde": {strings.Repeat("1", 501)}, "tyst": {"1"}})
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("a 501-character phone number: got %d, want 413", rec.Code)
+	}
+}

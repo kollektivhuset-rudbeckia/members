@@ -121,6 +121,18 @@ var editable = map[string]bool{
 	"typ": true, "steg": true,
 }
 
+// noteLimit is how long the interview team's note may be. It is where they
+// write down how an interview went, so it gets room for a few paragraphs;
+// every other field on a card is a name, a number or an address.
+const noteLimit = 5000
+
+func fieldLimit(field string) int {
+	if field == "anteckning" {
+		return noteLimit
+	}
+	return 500
+}
+
 // handleCandidateField changes one field of one candidate.
 //
 // One field, because that is what a click on the board edits. The whole form
@@ -141,7 +153,7 @@ func (s *Server) handleCandidateField(w http.ResponseWriter, r *http.Request, v 
 		http.Error(w, "no such field", http.StatusBadRequest)
 		return
 	}
-	if len([]rune(value)) > 500 {
+	if len([]rune(value)) > fieldLimit(field) {
 		http.Error(w, "too long", http.StatusRequestEntityTooLarge)
 		return
 	}
