@@ -50,23 +50,9 @@ func (s *Server) handleCandidates(w http.ResponseWriter, r *http.Request, v *vie
 		return
 	}
 
-	// The team's notes are left out of what the page is given at all for
-	// anybody who may not read them, rather than only hidden by the
-	// template, so that a template change cannot leak them.
-	notes := v.May(string(config.PermPipelineNotes))
-
 	byStage := map[string][]candidateView{}
 	for _, c := range list {
-		if !notes {
-			c.Note, c.Responsible = "", ""
-		}
-		cv := candidateView{Candidate: c, Reason: s.reasonWords(c, string(v.Lang))}
-		if c.Email != "" {
-			if m, err := s.store.MemberByEmail(r.Context(), c.Email, v.Loc); err == nil {
-				cv.Member, cv.Known = m, true
-			}
-		}
-		byStage[c.Stage] = append(byStage[c.Stage], cv)
+		byStage[c.Stage] = append(byStage[c.Stage], s.candidateView(r, v, c))
 	}
 
 	// Every stage gets a lane, in the order the configuration lists them, and
@@ -102,6 +88,51 @@ func (s *Server) handleCandidates(w http.ResponseWriter, r *http.Request, v *vie
 		"JoinURL": s.rt.BaseURL + "/bli-medlem",
 	}
 	s.render(w, r, http.StatusOK, "pipeline.html", v)
+}
+
+// handleCandidate is one candidate on a page of their own: the inspector.
+//
+// The board shows a card as a few lines to scan; everything about a person —
+// every field, the whole note, what they wrote themselves, the actions — is
+// here, with room to write. With JavaScript the board opens this page in a
+// panel over itself rather than navigating, but it is a real page first, so
+// it works without, and a link to it can be sent to somebody.
+func (s *Server) handleCandidate(w http.ResponseWriter, r *http.Request, v *view) {
+	c, ok := s.candidate(w, r, v)
+	if !ok {
+		return
+	}
+	cv := s.candidateView(r, v, c)
+	stage := c.Stage
+	if st, known := s.cfg.Pipeline.Stage(c.Stage); known {
+		stage = st.NameFor(string(v.Lang))
+	}
+	v.Title = c.Name()
+	v.Data = map[string]any{
+		"C":      cv,
+		"Stage":  stage,
+		"Stages": s.cfg.Pipeline.Stages,
+	}
+	s.render(w, r, http.StatusOK, "candidate.html", v)
+}
+
+// candidateView is a candidate as this viewer may see them, with what the
+// register already knows about them.
+//
+// The team's notes are left out of what the page is given at all for anybody
+// who may not read them, rather than only hidden by the template, so that a
+// template change cannot leak them.
+func (s *Server) candidateView(r *http.Request, v *view, c store.Candidate) candidateView {
+	if !v.May(string(config.PermPipelineNotes)) {
+		c.Note, c.Responsible = "", ""
+	}
+	cv := candidateView{Candidate: c, Reason: s.reasonWords(c, string(v.Lang))}
+	if c.Email != "" {
+		if m, err := s.store.MemberByEmail(r.Context(), c.Email, v.Loc); err == nil {
+			cv.Member, cv.Known = m, true
+		}
+	}
+	return cv
 }
 
 // handleNewCandidateForm is the page behind the "add" button.
@@ -313,15 +344,30 @@ func (s *Server) handleSaveCandidate(w http.ResponseWriter, r *http.Request, v *
 		return
 	}
 	f := readCandidateForm(r)
+	// The inspector saves with a script and only wants to know it worked. It
+	// must be told in so many words: a redirect is also what an expired
+	// session answers, and the two must never look alike.
+	quiet := r.Header.Get("Accept") == "application/json" || r.FormValue("tyst") == "1"
+	refuse := func(status int, flash string) {
+		if quiet {
+			http.Error(w, flash, status)
+			return
+		}
+		s.flash(w, "error", flash)
+		http.Redirect(w, r, "/kandidater", http.StatusSeeOther)
+	}
 
 	// A move on its own posts only the stage; a full edit posts everything.
 	if stage := f.Stage; stage != "" {
 		if _, known := s.cfg.Pipeline.Stage(stage); !known {
-			s.flash(w, "error", "flash.candidate.nostage")
-			http.Redirect(w, r, "/kandidater", http.StatusSeeOther)
+			refuse(http.StatusBadRequest, "flash.candidate.nostage")
 			return
 		}
 		c.Stage = stage
+	}
+	if len([]rune(f.Note)) > noteLimit {
+		refuse(http.StatusRequestEntityTooLarge, "flash.candidate.toolong")
+		return
 	}
 	if r.FormValue("hela") == "1" {
 		c.FirstName, c.LastName = f.FirstName, f.LastName
@@ -342,6 +388,10 @@ func (s *Server) handleSaveCandidate(w http.ResponseWriter, r *http.Request, v *
 	if err := s.store.UpdateCandidate(r.Context(), c); err != nil {
 		s.log.Error("could not save a candidate", "err", err)
 		s.errorPage(w, r, http.StatusInternalServerError, "error.nowrite", "error.nowrite.how")
+		return
+	}
+	if quiet {
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 	s.flash(w, "ok", "flash.candidate.saved", c.Name())
@@ -368,17 +418,34 @@ func (s *Server) handleWelcomeCandidate(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
+	// Only the team that runs the board moves cards on it. The cashier marks
+	// somebody who has paid as a friend member and the card stays where it
+	// is, with a chip saying so: whether that person has been interviewed,
+	// and when the card is done, is still ny@'s to decide. The cashier goes
+	// back to the board rather than to the member, since the board is where
+	// they were working through the payments.
+	moves := v.May(string(config.PermPipelineEdit))
+	back := func(memberID string) string {
+		if moves {
+			return "/medlem/" + memberID
+		}
+		return "/kandidater"
+	}
+
 	// Somebody may already be in the register, written down separately.
 	if existing, err := s.store.MemberByEmail(r.Context(), c.Email, v.Loc); err == nil {
-		c.MemberID, c.MovedAt, c.MovedBy = existing.ID, s.now(), v.Session.Email
-		if closed := s.welcomedStage(); closed != "" {
-			c.Stage = closed
+		c.MemberID = existing.ID
+		if moves {
+			c.MovedAt, c.MovedBy = s.now(), v.Session.Email
+			if closed := s.welcomedStage(); closed != "" {
+				c.Stage = closed
+			}
 		}
 		if err := s.store.UpdateCandidate(r.Context(), c); err != nil {
 			s.log.Error("could not close a candidate", "err", err)
 		}
 		s.flash(w, "warn", "flash.alreadymember", existing.Name())
-		http.Redirect(w, r, "/medlem/"+existing.ID, http.StatusSeeOther)
+		http.Redirect(w, r, back(existing.ID), http.StatusSeeOther)
 		return
 	}
 
@@ -412,9 +479,12 @@ func (s *Server) handleWelcomeCandidate(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	c.MemberID, c.MovedAt, c.MovedBy = m.ID, now, v.Session.Email
-	if closed := s.welcomedStage(); closed != "" {
-		c.Stage = closed
+	c.MemberID = m.ID
+	if moves {
+		c.MovedAt, c.MovedBy = now, v.Session.Email
+		if closed := s.welcomedStage(); closed != "" {
+			c.Stage = closed
+		}
 	}
 	if err := s.store.UpdateCandidate(r.Context(), c); err != nil {
 		s.log.Error("could not close a candidate", "err", err)
@@ -424,7 +494,7 @@ func (s *Server) handleWelcomeCandidate(w http.ResponseWriter, r *http.Request, 
 	s.sync.Nudge(sync.TriggerMember)
 	s.flash(w, "ok", "flash.welcomed", m.Name())
 	s.log.Info("a candidate became a member", "id", m.ID, "email", m.Email, "by", v.Session.Email)
-	http.Redirect(w, r, "/medlem/"+m.ID, http.StatusSeeOther)
+	http.Redirect(w, r, back(m.ID), http.StatusSeeOther)
 }
 
 // handleDeleteCandidate takes one card off the board.

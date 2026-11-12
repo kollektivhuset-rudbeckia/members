@@ -27,14 +27,12 @@
 	</div>
 </div>
 
-<div class="board" {{if $edit}}data-board
-     data-msg-hint="{{t "pipeline.note.hint"}}"
-     data-msg-failed="{{t "pipeline.note.failed"}}"
-     data-msg-signedout="{{t "pipeline.note.signedout"}}"
-     data-msg-draft="{{t "pipeline.note.draft"}}"
-     data-msg-discard="{{t "pipeline.note.discard"}}"{{end}}>
+<div class="board" {{if $edit}}data-board{{end}} data-msg-draft="{{t "pipeline.note.draft"}}">
 	{{range .Data.Columns}}
-	<section class="lane {{if .Stage.Closed}}is-closed{{end}}" data-lane="{{.Stage.ID}}">
+	{{/* The whole lane takes a dropped card, so a finished lane that has been
+	     folded away still does. */}}
+	<section class="lane {{if .Stage.Closed}}is-closed{{end}}" data-lane="{{.Stage.ID}}"
+	         {{if .Stage.Closed}}data-foldable{{end}} {{if $edit}}data-drop{{end}}>
 		<header class="lane-head">
 			<h2>{{.Name}}</h2>
 			<span class="tag" data-lane-count>{{len .Candidates}}</span>
@@ -48,87 +46,40 @@
 				<button type="submit" class="link-button quiet-danger">{{t "pipeline.clear"}}</button>
 			</form>
 			{{end}}
+			{{if .Stage.Closed}}
+			{{/* Finished lanes are history. Script folds them by default so
+			     the live lanes get the room; without it they stay open. */}}
+			<button type="button" class="link-button lane-fold" data-fold hidden
+			        data-fold-label="{{t "pipeline.fold"}}" data-unfold-label="{{t "pipeline.unfold"}}">{{t "pipeline.fold"}}</button>
+			{{end}}
 		</header>
 
-		<ul class="lane-cards" {{if $edit}}data-drop{{end}}>
+		<ul class="lane-cards">
 			{{range .Candidates}}
 			{{$c := .Candidate}}
+			{{/* A card is a few lines to scan and a handle to drag. Clicking
+			     it opens the inspector, where everything about the person
+			     is, with room to write: a real page without script, a panel
+			     over the board with it. */}}
 			<li class="card-c" {{if $edit}}draggable="true"{{end}} data-card="{{$c.ID}}">
-				<div class="card-top">
-					{{if $edit}}<span class="grip" aria-hidden="true">⠿</span>{{end}}
-					{{/* The click-to-edit hooks come off entirely for a reader.
-					     A field that opens an input and then saves nothing is
-					     worse than plain text. */}}
-					<strong {{if $edit}}data-edit="fornamn" data-id="{{$c.ID}}" data-label="{{t "form.firstname"}}"{{end}}>{{with $c.FirstName}}{{.}}{{else}}—{{end}}</strong>
-					<strong {{if $edit}}data-edit="efternamn" data-id="{{$c.ID}}" data-label="{{t "form.lastname"}}"{{end}}>{{with $c.LastName}}{{.}}{{else}}—{{end}}</strong>
-					{{if .Known}}<span class="chip chip-van" title="{{t "pipeline.already" .Member.Name}}">{{t "pipeline.ismember"}}</span>{{end}}
-				</div>
-
-				<dl class="card-fields">
-					<div><dt>{{t "pipeline.apartment"}}</dt>
-						<dd {{if $edit}}data-edit="lagenhet" data-id="{{$c.ID}}"{{end}}>{{with $c.Apartment}}{{.}}{{else}}—{{end}}</dd></div>
-					<div><dt>{{t "pipeline.interview"}}</dt>
-						<dd {{if $edit}}data-edit="intervju" data-id="{{$c.ID}}" data-type="date"
-						    data-raw="{{if $c.InterviewOn.Valid}}{{isoDate (local $c.InterviewOn.Time)}}{{end}}"{{end}}>{{if $c.InterviewOn.Valid}}{{dateShort (local $c.InterviewOn.Time)}}{{else}}—{{end}}</dd></div>
-					{{if $notes}}<div><dt>{{t "pipeline.responsible"}}</dt>
-						<dd {{if $edit}}data-edit="ansvarig" data-id="{{$c.ID}}"{{end}}>{{with $c.Responsible}}{{.}}{{else}}—{{end}}</dd></div>{{end}}
-					<div><dt>{{t "form.email"}}</dt>
-						<dd {{if $edit}}data-edit="epost" data-id="{{$c.ID}}" data-type="email"{{end}}>{{with $c.Email}}{{.}}{{else}}—{{end}}</dd></div>
-					<div><dt>{{t "form.phone"}}</dt>
-						<dd {{if $edit}}data-edit="telefon" data-id="{{$c.ID}}" data-type="tel"{{end}}>{{with $c.Phone}}{{.}}{{else}}—{{end}}</dd></div>
-					{{if $notes}}<div><dt>{{t "form.note"}}</dt>
-						<dd class="card-note" {{if $edit}}data-edit="anteckning" data-id="{{$c.ID}}" data-type="multiline" data-max="5000" data-label="{{t "form.note"}}"{{end}}>{{with $c.Note}}{{.}}{{else}}—{{end}}</dd></div>{{end}}
-					{{/* What the applicant said themselves, so not editable:
-					     correcting somebody's own answer would lose it. */}}
-					{{with .Reason}}<div><dt>{{t "join.why.short"}}</dt><dd>{{.}}</dd></div>{{end}}
-				</dl>
-
-				{{with $c.Message}}<p class="card-said">{{.}}</p>{{end}}
-
-				{{if $edit}}
-				<footer class="card-foot">
-					{{/* Without JavaScript this is how a card moves, and with
-					     it the same control still works — dragging is the
-					     shortcut, not the only way. */}}
-					<form method="post" action="/kandidater/{{$c.ID}}" class="inline move-form">
-						<input type="hidden" name="tillbaka" value="{{$.Here}}">
-						<label class="visually-hidden" for="mv-{{$c.ID}}">{{t "pipeline.stage"}}</label>
-						<select id="mv-{{$c.ID}}" name="steg" data-move>
-							{{range $.Data.Stages}}<option value="{{.ID}}" {{if eq $c.Stage .ID}}selected{{end}}>{{.NameFor (printf "%s" $.Lang)}}</option>{{end}}
-						</select>
-						<noscript><button type="submit" class="button small">{{t "pipeline.move"}}</button></noscript>
-					</form>
-
-					{{if and $c.Email (not .Known)}}
-					<form method="post" action="/kandidater/{{$c.ID}}/valkomna" class="inline"
-					      data-confirm="{{t "pipeline.welcome.confirm" $c.Name}}">
-						<button type="submit" class="link-button">{{t "pipeline.welcome"}}</button>
-					</form>
-					{{else if .Known}}
-					<a class="quiet-link small" href="/medlem/{{.Member.ID}}">{{t "applications.already.see"}}</a>
+				<a class="card-open" href="/kandidater/{{$c.ID}}" data-inspect draggable="false"
+				   aria-label="{{t "pipeline.open" $c.Name}}">
+					<span class="card-top">
+						<strong class="card-name">{{with $c.Name}}{{.}}{{else}}—{{end}}</strong>
+						{{if .Known}}<span class="chip chip-van" title="{{t "pipeline.already" .Member.Name}}">{{t "pipeline.ismember"}}</span>{{end}}
+					</span>
+					{{if or $c.InterviewOn.Valid (and $notes $c.Responsible)}}
+					<span class="card-meta">
+						{{if $c.InterviewOn.Valid}}<span class="kv"><span class="k">{{t "pipeline.interview.short"}}</span> {{dateShort (local $c.InterviewOn.Time)}}</span>{{end}}
+						{{if and $notes $c.Responsible}}<span class="kv"><span class="k">{{t "pipeline.responsible"}}</span> {{$c.Responsible}}</span>{{end}}
+					</span>
 					{{end}}
-
-					{{/* Throwing a card away is the team's own tidying: a
-					     duplicate from somebody pressing the button twice, a
-					     row typed in by mistake. It never reaches the
-					     register, which the confirmation says out loud. */}}
-					<form method="post" action="/kandidater/{{$c.ID}}/ta-bort" class="inline card-delete"
-					      data-confirm="{{t "pipeline.delete.confirm" $c.Name}}">
-						<button type="submit" class="link-button quiet-danger">{{t "pipeline.delete"}}</button>
-					</form>
-				</footer>
-				{{else if and $welcome $c.Email (not .Known)}}
-				<footer class="card-foot">
-					<form method="post" action="/kandidater/{{$c.ID}}/valkomna" class="inline"
-					      data-confirm="{{t "pipeline.welcome.confirm" $c.Name}}">
-						<button type="submit" class="link-button">{{t "pipeline.welcome"}}</button>
-					</form>
-				</footer>
-				{{else if .Known}}
-				<footer class="card-foot">
-					<a class="quiet-link small" href="/medlem/{{.Member.ID}}">{{t "applications.already.see"}}</a>
-				</footer>
-				{{end}}
+					{{with .Reason}}<span class="card-reason">{{.}}</span>{{end}}
+					{{/* The team's own note is what they look for; anybody
+					     else sees the start of what the applicant wrote. */}}
+					{{if and $notes $c.Note}}<span class="card-preview">{{$c.Note}}</span>
+					{{else if $c.Message}}<span class="card-preview is-said">{{$c.Message}}</span>{{end}}
+				</a>
 			</li>
 			{{end}}
 		</ul>
@@ -141,6 +92,12 @@
 	· {{t "pipeline.publicform"}} <a href="/bli-medlem">{{.Data.JoinURL}}</a>
 	{{if $edit}}<br>{{t "pipeline.clear.why"}}{{end}}
 </p>
+
+{{/* The inspector, when script is there to fill it. */}}
+<dialog id="inspektor" class="sheet inspector-sheet" aria-labelledby="inspector-title">
+	<form method="dialog" class="sheet-close"><button aria-label="{{t "close"}}">×</button></form>
+	<div data-inspector-slot></div>
+</dialog>
 
 {{if $edit}}
 {{/* The dialog the add button opens. It holds the same fields as the page at

@@ -121,18 +121,24 @@ const (
 //	add a member       ✓         ✓          ✓
 //	change one       propose     ✓          ✓
 //	remove one       propose  propose       ✓
-//	fee paid or not    ✗         ✓          ✗ (see PaymentRoles)
+//	fee paid or not    ✗         ✓          ✓* (see PaymentRoles)
 //	decide proposals   ✗         ✗          ✓
 //	sync by hand       ✗         ✗          ✓
 //	see the candidates ✓         ✓          ✓
 //	see the team notes ✓         ✗          ✓
-//	make vänmedlem     ✓         ✓          ✗
-//	work the board     ✓         ✗          ✗
+//	make vänmedlem     ✓         ✓          ✓*
+//	work the board     ✓         ✗          ✓*
+//
+// The board may do everything. The starred ones are other people's jobs and
+// the board is not meant to do them day to day — the cashier ticks off fees,
+// the interview team runs the candidate board — but the board answers for
+// the association and has to be able to step in and put something right
+// without first asking for a permission it ought to have had.
 type Access struct {
-	// PaymentRoles are the roles that may touch a payment. The house asked
-	// for this to be the cashier alone — they are the one with the bank
-	// statement open — so that is the default. A house that wants the board
-	// to be able to fix a slip sets PAYMENT_ROLES=cashier,board.
+	// PaymentRoles are the roles besides the board that may touch a
+	// payment. The house asked for this to be the cashier's job — they are
+	// the one with the bank statement open — so that is the default. The
+	// board can always step in and fix a slip, whatever this says.
 	PaymentRoles map[Role]bool
 }
 
@@ -140,6 +146,11 @@ type Access struct {
 func (a Access) May(r Role, p Permission) bool {
 	if !r.LoggedIn() {
 		return false
+	}
+	// The board may override anything. It never proposes, because there is
+	// nobody above it to ask.
+	if r == RoleBoard {
+		return p != PermPropose
 	}
 	switch p {
 	case PermView, PermAdd:

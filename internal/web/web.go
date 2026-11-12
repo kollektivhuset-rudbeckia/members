@@ -75,7 +75,7 @@ type Server struct {
 var pages = []string{
 	"index.html", "login.html", "error.html", "member.html", "new.html",
 	"payments.html", "proposals.html", "admin.html",
-	"join.html", "thanks.html", "pipeline.html", "candidate_new.html",
+	"join.html", "thanks.html", "pipeline.html", "candidate_new.html", "candidate.html",
 }
 
 // layouts are included in every page set.
@@ -164,6 +164,7 @@ func (s *Server) Handler() http.Handler {
 	// where the board reaching in and moving somebody is not.
 	mux.Handle("GET /kandidater", s.can(config.PermPipeline, s.handleCandidates))
 	mux.Handle("GET /kandidater/ny", s.can(config.PermPipelineEdit, s.handleNewCandidateForm))
+	mux.Handle("GET /kandidater/{id}", s.can(config.PermPipeline, s.handleCandidate))
 	mux.Handle("POST /kandidater/ny", s.can(config.PermPipelineEdit, s.handleAddCandidate))
 	mux.Handle("POST /kandidater/{id}/falt", s.can(config.PermPipelineEdit, s.handleCandidateField))
 	mux.Handle("POST /kandidater/{id}", s.can(config.PermPipelineEdit, s.handleSaveCandidate))

@@ -1,0 +1,137 @@
+{{/* One candidate: the inspector. A page of its own first, so it works
+     without JavaScript and can be linked to; the board fetches it and shows
+     the [data-inspector] part in a panel over itself. */}}
+{{define "inspector"}}
+{{$cv := .Data.C}}
+{{$c := $cv.Candidate}}
+{{$edit := .May "pipeline.edit"}}
+{{$notes := .May "pipeline.notes"}}
+{{$welcome := .May "pipeline.welcome"}}
+<article class="inspector" data-inspector data-id="{{$c.ID}}"
+         data-msg-failed="{{t "pipeline.note.failed"}}"
+         data-msg-signedout="{{t "pipeline.note.signedout"}}"
+         data-msg-signin="{{t "pipeline.note.signin"}}"
+         data-msg-restored="{{t "pipeline.note.restored"}}"
+         data-msg-discard="{{t "pipeline.note.discard"}}"
+         data-msg-saved="{{t "pipeline.saved"}}">
+	<header class="inspector-head">
+		<p class="inspector-stage">{{.Data.Stage}}</p>
+		<h1 class="inspector-name" id="inspector-title">{{$c.Name}}</h1>
+		{{if $cv.Known}}<a class="chip chip-van" href="/medlem/{{$cv.Member.ID}}" title="{{t "pipeline.already" $cv.Member.Name}}">{{t "pipeline.ismember"}}</a>{{end}}
+		<p class="inspector-trail">
+			{{if eq $c.Source "form"}}{{t "pipeline.came.form" (dateShort (local $c.CreatedAt))}}{{else if eq $c.Source "import"}}{{t "pipeline.came.import" (dateShort (local $c.CreatedAt))}}{{else}}{{t "pipeline.came.hand" (dateShort (local $c.CreatedAt))}}{{end}}{{if $c.MovedBy}} · {{t "pipeline.moved" (dateShort (local $c.MovedAt)) $c.MovedBy}}{{end}}
+		</p>
+	</header>
+
+	{{/* What they said themselves comes first: it is what the team reads
+	     before deciding anything, and nobody edits it. */}}
+	{{if or $cv.Reason $c.Message}}
+	<section class="inspector-own">
+		<h2>{{t "pipeline.own"}}</h2>
+		{{with $cv.Reason}}<p class="card-reason">{{.}}</p>{{end}}
+		{{with $c.Message}}<p class="inspector-said">{{.}}</p>{{end}}
+	</section>
+	{{end}}
+
+	{{if $edit}}
+	<form method="post" action="/kandidater/{{$c.ID}}" class="inspector-form" data-inspector-form>
+		<input type="hidden" name="hela" value="1">
+		<input type="hidden" name="tillbaka" value="/kandidater">
+		<div class="field field-wide">
+			<label for="in-anteckning">{{t "form.note"}}</label>
+			<textarea id="in-anteckning" name="anteckning" rows="8" maxlength="5000" data-draft>{{$c.Note}}</textarea>
+		</div>
+		<div class="field-grid">
+			<div class="field">
+				<label for="in-steg">{{t "pipeline.stage"}}</label>
+				<select id="in-steg" name="steg">
+					{{range .Data.Stages}}<option value="{{.ID}}" {{if eq $c.Stage .ID}}selected{{end}}>{{.NameFor (printf "%s" $.Lang)}}</option>{{end}}
+				</select>
+			</div>
+			<div class="field">
+				<label for="in-intervju">{{t "pipeline.interview"}}</label>
+				<input id="in-intervju" name="intervju" type="date" value="{{if $c.InterviewOn.Valid}}{{isoDate (local $c.InterviewOn.Time)}}{{end}}">
+			</div>
+			<div class="field">
+				<label for="in-ansvarig">{{t "pipeline.responsible"}}</label>
+				<input id="in-ansvarig" name="ansvarig" type="text" value="{{$c.Responsible}}">
+			</div>
+			<div class="field">
+				<label for="in-lagenhet">{{t "pipeline.apartment"}}</label>
+				<input id="in-lagenhet" name="lagenhet" type="text" value="{{$c.Apartment}}">
+			</div>
+			<div class="field">
+				<label for="in-fornamn">{{t "form.firstname"}}</label>
+				<input id="in-fornamn" name="fornamn" type="text" required autocomplete="off" value="{{$c.FirstName}}">
+			</div>
+			<div class="field">
+				<label for="in-efternamn">{{t "form.lastname"}}</label>
+				<input id="in-efternamn" name="efternamn" type="text" autocomplete="off" value="{{$c.LastName}}">
+			</div>
+			<div class="field">
+				<label for="in-epost">{{t "form.email"}}</label>
+				<input id="in-epost" name="epost" type="email" spellcheck="false" autocomplete="off" value="{{$c.Email}}">
+			</div>
+			<div class="field">
+				<label for="in-telefon">{{t "form.phone"}}</label>
+				<input id="in-telefon" name="telefon" type="tel" autocomplete="off" value="{{$c.Phone}}">
+			</div>
+		</div>
+		<p class="inspector-status" data-status role="status" aria-live="polite"></p>
+		<div class="form-actions inspector-save">
+			<button type="submit" class="button primary">{{t "pipeline.save"}}</button>
+			<a class="button ghost" href="/kandidater" data-inspector-close>{{t "cancel"}}</a>
+		</div>
+	</form>
+	{{else}}
+	<dl class="inspector-facts">
+		<div><dt>{{t "pipeline.stage"}}</dt><dd>{{.Data.Stage}}</dd></div>
+		{{if $c.InterviewOn.Valid}}<div><dt>{{t "pipeline.interview"}}</dt><dd>{{dateShort (local $c.InterviewOn.Time)}}</dd></div>{{end}}
+		{{if and $notes $c.Responsible}}<div><dt>{{t "pipeline.responsible"}}</dt><dd>{{$c.Responsible}}</dd></div>{{end}}
+		{{with $c.Apartment}}<div><dt>{{t "pipeline.apartment"}}</dt><dd>{{.}}</dd></div>{{end}}
+		{{with $c.Email}}<div><dt>{{t "form.email"}}</dt><dd><a href="mailto:{{.}}">{{.}}</a></dd></div>{{end}}
+		{{with $c.Phone}}<div><dt>{{t "form.phone"}}</dt><dd><a href="tel:{{.}}">{{.}}</a></dd></div>{{end}}
+		{{if and $notes $c.Note}}<div class="is-wide"><dt>{{t "form.note"}}</dt><dd class="card-note">{{$c.Note}}</dd></div>{{end}}
+	</dl>
+	{{end}}
+
+	{{if or (and $welcome $c.Email (not $cv.Known)) $edit}}
+	<footer class="inspector-actions">
+		{{if and $welcome $c.Email (not $cv.Known)}}
+		{{if $edit}}
+		<form method="post" action="/kandidater/{{$c.ID}}/valkomna" class="inline"
+		      data-confirm="{{t "pipeline.welcome.confirm" $c.Name}}">
+			<button type="submit" class="button">{{t "pipeline.welcome"}}</button>
+		</form>
+		{{else}}
+		{{/* The cashier marks; the card stays put. Moving it is the
+		     interview team's call. */}}
+		<form method="post" action="/kandidater/{{$c.ID}}/valkomna" class="inline"
+		      data-confirm="{{t "pipeline.mark.confirm" $c.Name}}">
+			<button type="submit" class="button">{{t "pipeline.mark"}}</button>
+		</form>
+		{{end}}
+		{{else if and $welcome (not $c.Email)}}
+		<p class="hint">{{t "pipeline.noemail"}}</p>
+		{{end}}
+		{{if $edit}}
+		{{/* Throwing a card away is the team's own tidying: a duplicate from
+		     somebody pressing the button twice, a row typed in by mistake.
+		     It never reaches the register, which the confirmation says. */}}
+		<form method="post" action="/kandidater/{{$c.ID}}/ta-bort" class="inline inspector-delete"
+		      data-confirm="{{t "pipeline.delete.confirm" $c.Name}}">
+			<button type="submit" class="link-button quiet-danger">{{t "pipeline.delete"}}</button>
+		</form>
+		{{end}}
+	</footer>
+	{{end}}
+</article>
+{{end}}
+
+{{define "content"}}
+<nav class="crumbs"><a href="/kandidater">{{t "pipeline.title"}}</a><span aria-hidden="true">›</span>{{.Data.C.Candidate.Name}}</nav>
+<div class="narrow">
+	<div class="panel">{{template "inspector" .}}</div>
+</div>
+{{end}}
+{{template "base" .}}

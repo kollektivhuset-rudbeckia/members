@@ -18,7 +18,7 @@ import (
 // The router is what has to hold this. A control hidden in a template is a
 // courtesy to the reader, not a permission.
 func TestOnlyTheInterviewTeamMayWorkTheBoard(t *testing.T) {
-	for _, role := range []config.Role{config.RoleBoard, config.RoleCashier} {
+	for _, role := range []config.Role{config.RoleCashier} {
 		t.Run(string(role), func(t *testing.T) {
 			h := newHarness(t)
 			id := h.candidate(t, "Bo", "bo@example.test", "new")
@@ -73,26 +73,37 @@ func TestWhoMayLookAtTheBoard(t *testing.T) {
 	}
 }
 
-// A reader gets no controls that would fail if they used them.
-func TestTheBoardIsShownReadOnlyToTheBoard(t *testing.T) {
+// The board is not meant to work the candidate board, but answers for the
+// association and may step in: it gets the same controls as the team, and
+// what it does there goes through.
+func TestTheBoardMayOverrideTheCandidateBoard(t *testing.T) {
 	h := newHarness(t)
-	h.candidate(t, "Bo", "bo@example.test", "new")
+	id := h.candidate(t, "Bo", "bo@example.test", "new")
 
 	body := h.do(t, config.RoleBoard, "GET", "/kandidater", nil).Body.String()
-	for _, unwanted := range []string{
-		"/ta-bort", "/kandidater/rensa", "/valkomna", "data-edit=", "draggable=", "data-board",
-	} {
-		if strings.Contains(body, unwanted) {
-			t.Errorf("the read-only board still offers %q", unwanted)
+	for _, wanted := range []string{"draggable=", "data-board", "/kandidater/" + id} {
+		if !strings.Contains(body, wanted) {
+			t.Errorf("the board's view is missing %q", wanted)
+		}
+	}
+	body = h.do(t, config.RoleBoard, "GET", "/kandidater/"+id, nil).Body.String()
+	for _, wanted := range []string{"data-inspector-form", "/ta-bort", "/valkomna"} {
+		if !strings.Contains(body, wanted) {
+			t.Errorf("the board's inspector is missing %q", wanted)
 		}
 	}
 
-	// And the team's own view does have them.
-	body = h.do(t, config.RoleIntake, "GET", "/kandidater", nil).Body.String()
-	for _, wanted := range []string{"/ta-bort", "data-edit=", "draggable="} {
-		if !strings.Contains(body, wanted) {
-			t.Errorf("the team's board is missing %q", wanted)
-		}
+	rec := h.do(t, config.RoleBoard, "POST", "/kandidater/"+id+"/falt",
+		url.Values{"falt": {"steg"}, "varde": {"limbo"}, "tyst": {"1"}})
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("the board moving a card: got %d, want 204", rec.Code)
+	}
+	c, err := h.store.Candidate(context.Background(), id, h.cfg.Location())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Stage != "limbo" {
+		t.Errorf("the card is in %q, want limbo", c.Stage)
 	}
 }
 
@@ -275,17 +286,6 @@ func TestTheNoteHoldsAWholeInterview(t *testing.T) {
 	}
 }
 
-// Making somebody a friend member is the one thing on the board that is not
-// only the interview team's: the board itself decides proposals, it does not
-// welcome people.
-func TestTheBoardMayNotWelcomeAnybody(t *testing.T) {
-	h := newHarness(t)
-	id := h.candidate(t, "Bo", "bo@example.test", "new")
-	if rec := h.do(t, config.RoleBoard, "POST", "/kandidater/"+id+"/valkomna", url.Values{}); rec.Code != http.StatusForbidden {
-		t.Errorf("the board welcoming somebody: got %d, want 403", rec.Code)
-	}
-}
-
 // The cashier is the one with the bank statement open, so somebody who paid
 // the fee straight from the join form is the cashier's to make a friend
 // member. The interview team's notes about them are not the cashier's to read.
@@ -303,18 +303,31 @@ func TestTheCashierMakesAFriendMemberWithoutSeeingTheNotes(t *testing.T) {
 	}
 
 	body := h.do(t, config.RoleCashier, "GET", "/kandidater", nil).Body.String()
-	for _, unwanted := range []string{note, responsible, "/ta-bort", "/kandidater/rensa", "data-edit=", "data-board"} {
+	for _, unwanted := range []string{note, responsible, "/kandidater/rensa", `draggable="true"`, "data-board"} {
 		if strings.Contains(body, unwanted) {
 			t.Errorf("the cashier's board shows %q", unwanted)
 		}
 	}
-	if !strings.Contains(body, "/kandidater/"+id+"/valkomna") {
-		t.Error("the cashier's board has no way to make the candidate a friend member")
+	inspector := h.do(t, config.RoleCashier, "GET", "/kandidater/"+id, nil)
+	if inspector.Code != http.StatusOK {
+		t.Fatalf("the cashier opening a card: got %d", inspector.Code)
 	}
-	// The team and the board still read them.
+	body = inspector.Body.String()
+	for _, unwanted := range []string{note, responsible, "/ta-bort", "data-inspector-form", `name="steg"`} {
+		if strings.Contains(body, unwanted) {
+			t.Errorf("the cashier's inspector shows %q", unwanted)
+		}
+	}
+	if !strings.Contains(body, "/kandidater/"+id+"/valkomna") {
+		t.Error("the cashier's inspector has no way to make the candidate a friend member")
+	}
+	// The team and the board still read them, on the card and in full.
 	for _, role := range []config.Role{config.RoleIntake, config.RoleBoard} {
 		if body := h.do(t, role, "GET", "/kandidater", nil).Body.String(); !strings.Contains(body, note) {
-			t.Errorf("%s no longer sees the team's note", role)
+			t.Errorf("%s no longer sees the team's note on the card", role)
+		}
+		if body := h.do(t, role, "GET", "/kandidater/"+id, nil).Body.String(); !strings.Contains(body, note) {
+			t.Errorf("%s no longer sees the team's note in the inspector", role)
 		}
 	}
 
@@ -322,11 +335,61 @@ func TestTheCashierMakesAFriendMemberWithoutSeeingTheNotes(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("the cashier welcoming: got %d, want a redirect", rec.Code)
 	}
+	if where := rec.Header().Get("Location"); where != "/kandidater" {
+		t.Errorf("the cashier was sent to %q, want back to the board", where)
+	}
+	// Marking is not moving: where the card stands is the interview team's.
+	c, err := h.store.Candidate(context.Background(), id, h.cfg.Location())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Stage != "new" {
+		t.Errorf("the cashier's mark moved the card to %q", c.Stage)
+	}
+	if c.MemberID == "" {
+		t.Error("the card does not know it became a member")
+	}
 	m, err := h.store.MemberByEmail(context.Background(), "per@example.test", h.cfg.Location())
 	if err != nil {
 		t.Fatalf("welcoming did not make a member: %v", err)
 	}
 	if m.Kind != config.KindVan {
 		t.Errorf("welcomed as %q, want a friend member", m.Kind)
+	}
+}
+
+// The inspector saves the whole card with a script, which must be told in so
+// many words that it worked. A redirect is what an expired session answers,
+// and if a save answered with one too, the two would look the same and an
+// interview's notes could vanish while the page said they were kept.
+func TestTheInspectorSavesQuietlyAndAnExpiredSessionDoesNot(t *testing.T) {
+	h := newHarness(t)
+	id := h.candidate(t, "Per", "per@example.test", "new")
+	form := url.Values{
+		"hela": {"1"}, "tyst": {"1"}, "fornamn": {"Per-Ulf"}, "efternamn": {"Nilsson"},
+		"epost": {"per@example.test"}, "steg": {"interview"}, "intervju": {"2026-11-10"},
+		"ansvarig": {"gunilla"}, "anteckning": {"Åt middag tillsammans.\n\nVill provbo."},
+	}
+	rec := h.do(t, config.RoleIntake, "POST", "/kandidater/"+id, form)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("saving from the inspector: got %d, want 204", rec.Code)
+	}
+	c, err := h.store.Candidate(context.Background(), id, h.cfg.Location())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.FirstName != "Per-Ulf" || c.Stage != "interview" || c.Responsible != "gunilla" ||
+		c.Note != "Åt middag tillsammans.\n\nVill provbo." || !c.InterviewOn.Valid {
+		t.Errorf("not everything was saved: %+v", c)
+	}
+
+	rec = h.do(t, config.RoleNone, "POST", "/kandidater/"+id, form)
+	if rec.Code == http.StatusNoContent || rec.Code == http.StatusOK {
+		t.Errorf("a save without a session answered %d, which looks like success", rec.Code)
+	}
+
+	form.Set("anteckning", strings.Repeat("x", noteLimit+1))
+	if rec := h.do(t, config.RoleIntake, "POST", "/kandidater/"+id, form); rec.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("a note over the limit: got %d, want 413", rec.Code)
 	}
 }

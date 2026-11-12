@@ -23,13 +23,16 @@
 	}
 
 	// --- Ask before anything irreversible -----------------------------------
-	document.querySelectorAll('form[data-confirm]').forEach(function (form) {
-		form.addEventListener('submit', function (event) {
-			if (!window.confirm(form.getAttribute('data-confirm'))) {
-				event.preventDefault();
-			}
-		});
-	});
+	// Listened for on the document rather than form by form, so that forms
+	// that arrive later — the candidate inspector — are asked about too.
+	document.addEventListener('submit', function (event) {
+		var form = event.target;
+		if (!form.matches || !form.matches('form[data-confirm]')) { return; }
+		if (!window.confirm(form.getAttribute('data-confirm'))) {
+			event.preventDefault();
+			event.stopImmediatePropagation();
+		}
+	}, true);
 
 	// --- Reveal the "something else" box only when it is wanted -------------
 	// The box is in the page whether or not this runs: hiding it by default
@@ -145,6 +148,43 @@
 		sync();
 	}
 
+	// --- Talking to the server without leaving the page ---------------------
+	// Redirects are never followed: a session that has run out answers with a
+	// redirect to the sign-in page, and following it would come back 200 with
+	// that page and look exactly like a save.
+	var post = function (url, body) {
+		body.set('tyst', '1');
+		return fetch(url, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			body: body.toString(),
+			redirect: 'manual',
+			credentials: 'same-origin'
+		}).then(function (r) {
+			if (r.type === 'opaqueredirect' || r.status === 0 || (r.status >= 300 && r.status < 400)) {
+				var e = new Error('signed out'); e.signedOut = true; throw e;
+			}
+			if (!r.ok) { throw new Error('status ' + r.status); }
+		});
+	};
+
+	// --- Drafts of the interview team's notes --------------------------------
+	// Whatever is typed into a note is kept in this browser until the server
+	// has it, so a failed save, a closed tab or an expired session never costs
+	// anybody an interview's worth of writing.
+	var draftKey = function (id) { return 'utkast:kandidat:' + id + ':anteckning'; };
+	var draft = {
+		get: function (id) {
+			try { return window.localStorage.getItem(draftKey(id)); } catch (e) { return null; }
+		},
+		set: function (id, text) {
+			try { window.localStorage.setItem(draftKey(id), text); } catch (e) { /* nothing to do */ }
+		},
+		drop: function (id) {
+			try { window.localStorage.removeItem(draftKey(id)); } catch (e) { /* nothing to do */ }
+		}
+	};
+
 	// --- The candidate board -------------------------------------------------
 	// Everything here is a shortcut for something the page can already do
 	// without it: the stage selector on each card moves a candidate, the add
@@ -155,65 +195,14 @@
 		var root = document.querySelector('[data-board]');
 		if (!root || !window.fetch) { return; }
 
-		// Ask the server to change one field, and say whether it took.
-		//
-		// Redirects are not followed: a session that has run out answers
-		// with a redirect to the sign-in page, and following it would come
-		// back 200 with the sign-in page and look exactly like a save.
+		// Moving a card is the one change made on the board itself; the rest
+		// is done in the inspector.
 		var save = function (id, field, value) {
 			var body = new URLSearchParams();
 			body.set('falt', field);
 			body.set('varde', value);
-			body.set('tyst', '1');
-			return fetch('/kandidater/' + encodeURIComponent(id) + '/falt', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-				body: body.toString(),
-				redirect: 'manual',
-				credentials: 'same-origin'
-			}).then(function (r) {
-				if (r.type === 'opaqueredirect' || r.status === 0 || (r.status >= 300 && r.status < 400)) {
-					var e = new Error('signed out'); e.signedOut = true; throw e;
-				}
-				if (!r.ok) { throw new Error('status ' + r.status); }
-			});
+			return post('/kandidater/' + encodeURIComponent(id) + '/falt', body);
 		};
-
-		var msg = function (name) { return root.getAttribute('data-msg-' + name) || ''; };
-
-		// --- Drafts --------------------------------------------------------
-		// Whatever is typed into a long field is kept in this browser until
-		// the server has it, so a failed save, a closed tab or an expired
-		// session never costs anybody an interview's worth of notes.
-		var draftKey = function (id, field) { return 'utkast:kandidat:' + id + ':' + field; };
-		var draft = {
-			get: function (id, field) {
-				try { return window.localStorage.getItem(draftKey(id, field)); } catch (e) { return null; }
-			},
-			set: function (id, field, text) {
-				try { window.localStorage.setItem(draftKey(id, field), text); } catch (e) { /* nothing to do */ }
-			},
-			drop: function (id, field) {
-				try { window.localStorage.removeItem(draftKey(id, field)); } catch (e) { /* nothing to do */ }
-			}
-		};
-		var storedText = function (cell) {
-			var raw = cell.getAttribute('data-raw');
-			if (raw !== null) { return raw; }
-			var shown = cell.textContent.trim();
-			return shown === '—' ? '' : shown;
-		};
-		// Point out drafts left over from last time, so they are found.
-		root.querySelectorAll('[data-type="multiline"]').forEach(function (cell) {
-			var kept = draft.get(cell.getAttribute('data-id'), cell.getAttribute('data-edit'));
-			if (kept === null) { return; }
-			if (kept.trim() === storedText(cell)) {
-				draft.drop(cell.getAttribute('data-id'), cell.getAttribute('data-edit'));
-				return;
-			}
-			cell.classList.add('has-draft');
-			cell.setAttribute('data-draft-label', msg('draft'));
-		});
 
 		var counts = function () {
 			root.querySelectorAll('[data-lane]').forEach(function (lane) {
@@ -222,150 +211,6 @@
 				if (tag) { tag.textContent = n; }
 			});
 		};
-
-		// --- Click a field to change it ---------------------------------
-		// One field at a time. Opening eleven inputs to correct a telephone
-		// number is what this replaces.
-		var editing = null;
-		root.addEventListener('click', function (event) {
-			if (event.target.closest('.inline-status a')) { return; }
-			var cell = event.target.closest('[data-edit]');
-			if (!cell || cell === editing || cell.querySelector('input, textarea')) { return; }
-			if (editing) { return; }
-
-			var field = cell.getAttribute('data-edit');
-			var id = cell.getAttribute('data-id');
-			var type = cell.getAttribute('data-type') || 'text';
-			var multiline = type === 'multiline';
-			var before = storedText(cell);
-
-			var input;
-			if (multiline) {
-				input = document.createElement('textarea');
-				input.rows = 4;
-				var kept = draft.get(id, field);
-				input.value = kept !== null ? kept : before;
-			} else {
-				input = document.createElement('input');
-				input.type = type;
-				input.value = before;
-			}
-			var max = cell.getAttribute('data-max');
-			if (max) { input.maxLength = parseInt(max, 10); }
-			input.className = 'inline-input';
-			input.setAttribute('aria-label', cell.getAttribute('data-label') || field);
-
-			// A long text is written below its label, across the whole card,
-			// with a line saying how it is saved and room for an error.
-			var row = cell.parentElement;
-			var status = null;
-			editing = cell;
-			cell.classList.remove('has-draft');
-			cell.textContent = '';
-			cell.appendChild(input);
-			if (multiline) {
-				row.classList.add('is-writing');
-				status = document.createElement('small');
-				status.className = 'inline-status';
-				status.textContent = msg('hint');
-				cell.appendChild(status);
-			}
-			var grow = function () {
-				if (!multiline) { return; }
-				input.style.height = 'auto';
-				input.style.height = (input.scrollHeight + 2) + 'px';
-			};
-			grow();
-			input.focus();
-			if (multiline) {
-				input.setSelectionRange(input.value.length, input.value.length);
-			} else {
-				input.select();
-			}
-
-			input.addEventListener('input', function () {
-				grow();
-				if (multiline) { draft.set(id, field, input.value); }
-			});
-
-			var busy = false;
-			var close = function (text) {
-				editing = null;
-				row.classList.remove('is-writing');
-				cell.textContent = text === '' ? '—' : text;
-			};
-			var finish = function (keep) {
-				if (busy || editing !== cell) { return; }
-				var value = keep ? input.value.trim() : before;
-
-				if (!keep || value === before) {
-					if (multiline) { draft.drop(id, field); }
-					close(before);
-					return;
-				}
-
-				busy = true;
-				cell.classList.remove('is-failed');
-				cell.classList.add('is-saving');
-				save(id, field, value).then(function () {
-					busy = false;
-					if (multiline) { draft.drop(id, field); }
-					// The card is dragged and read, not re-rendered, so the
-					// displayed form of a date is worked out here rather than
-					// asking the server for the whole page again.
-					if (cell.hasAttribute('data-raw')) { cell.setAttribute('data-raw', value); }
-					before = value;
-					close(value);
-					cell.classList.remove('is-saving');
-					cell.classList.add('is-saved');
-					setTimeout(function () { cell.classList.remove('is-saved'); }, 1200);
-				}).catch(function (err) {
-					busy = false;
-					cell.classList.remove('is-saving');
-					cell.classList.add('is-failed');
-					if (multiline) {
-						// Keep the editor open with the text in it. Throwing
-						// away what somebody wrote because the network
-						// hiccuped is the one thing this must never do.
-						draft.set(id, field, input.value);
-						status.textContent = err && err.signedOut ? msg('signedout') : msg('failed');
-						if (err && err.signedOut) {
-							var link = document.createElement('a');
-							link.href = '/login';
-							link.target = '_blank';
-							link.rel = 'noopener';
-							link.textContent = ' → /login';
-							status.appendChild(link);
-						}
-						return;
-					}
-					close(before);
-					// A change that did not save must not look as though it
-					// did; reload so the card shows what is actually stored.
-					setTimeout(function () { window.location.reload(); }, 900);
-				});
-			};
-
-			input.addEventListener('blur', function () { finish(true); });
-			input.addEventListener('keydown', function (e) {
-				if (e.key === 'Enter' && (!multiline || e.ctrlKey || e.metaKey)) {
-					e.preventDefault(); finish(true);
-				}
-				if (e.key === 'Escape') {
-					e.preventDefault();
-					if (multiline && input.value.trim() !== before && !window.confirm(msg('discard'))) { return; }
-					finish(false);
-				}
-			});
-		});
-
-		// A card must not start dragging because somebody selected text in a
-		// field they are editing.
-		root.addEventListener('mousedown', function (event) {
-			var card = event.target.closest('[data-card]');
-			if (!card) { return; }
-			card.draggable = !event.target.closest('[data-edit], input, select, button, a');
-		});
 
 		// --- Drag between lanes -------------------------------------------
 		var dragging = null;
@@ -383,33 +228,31 @@
 			dragging = null;
 			root.querySelectorAll('.is-over').forEach(function (l) { l.classList.remove('is-over'); });
 		});
+		// The whole lane is the target, header and all, so that a folded
+		// lane still takes a card.
 		root.addEventListener('dragover', function (event) {
 			if (!dragging) { return; }
-			var list = event.target.closest('[data-drop]');
-			if (!list) { return; }
+			var lane = event.target.closest('[data-drop]');
+			if (!lane) { return; }
 			event.preventDefault();
 			event.dataTransfer.dropEffect = 'move';
 			root.querySelectorAll('.is-over').forEach(function (l) { l.classList.remove('is-over'); });
-			list.closest('[data-lane]').classList.add('is-over');
+			lane.classList.add('is-over');
 		});
 		root.addEventListener('drop', function (event) {
-			var list = event.target.closest('[data-drop]');
-			if (!list || !dragging) { return; }
+			var lane = event.target.closest('[data-drop]');
+			if (!lane || !dragging) { return; }
 			event.preventDefault();
+			lane.classList.remove('is-over');
 
 			var card = dragging;
-			var lane = list.closest('[data-lane]');
+			var list = lane.querySelector('.lane-cards');
 			var stage = lane.getAttribute('data-lane');
 			var from = card.parentElement;
 			if (from === list) { return; }
 
 			list.appendChild(card);
 			counts();
-
-			// Keep the card's own selector honest, so the no-script path and
-			// the dragged position never disagree.
-			var select = card.querySelector('[data-move]');
-			if (select) { select.value = stage; }
 
 			card.classList.add('is-saving');
 			save(card.getAttribute('data-card'), 'steg', stage).then(function () {
@@ -418,23 +261,228 @@
 				// Put it back where it came from rather than leave the board
 				// showing a move that did not happen.
 				from.appendChild(card);
-				if (select) { select.value = from.closest('[data-lane]').getAttribute('data-lane'); }
 				card.classList.remove('is-saving');
 				counts();
 				window.location.reload();
 			});
 		});
 
-		// --- The stage selector, without a submit button --------------------
-		root.querySelectorAll('[data-move]').forEach(function (select) {
-			select.addEventListener('change', function () {
-				var card = select.closest('[data-card]');
-				var target = root.querySelector('[data-lane="' + select.value + '"] [data-drop]');
-				save(card.getAttribute('data-card'), 'steg', select.value).then(function () {
-					if (target) { target.appendChild(card); counts(); }
-				}).catch(function () { select.form.submit(); });
+	})();
+
+	// --- Reading the board, for everybody who can see it -------------------
+	// Finished lanes fold away so the live ones get the room. Without this
+	// every lane stays open.
+	(function boardView() {
+		var board = document.querySelector('.board');
+		if (!board) { return; }
+		var key = function (lane) { return 'kandidater:fold:' + lane.getAttribute('data-lane'); };
+		var remembered = function (lane) {
+			try { return window.localStorage.getItem(key(lane)); } catch (e) { return null; }
+		};
+		var fold = function (lane, folded, keep) {
+			lane.classList.toggle('is-folded', folded);
+			var button = lane.querySelector('[data-fold]');
+			if (button) {
+				button.textContent = button.getAttribute(folded ? 'data-unfold-label' : 'data-fold-label');
+				button.setAttribute('aria-expanded', folded ? 'false' : 'true');
+			}
+			if (keep) {
+				try { window.localStorage.setItem(key(lane), folded ? '1' : '0'); } catch (e) { /* nothing to do */ }
+			}
+		};
+		// A note that was written but never saved is pointed out on its card,
+		// so that it is found and finished rather than forgotten.
+		board.querySelectorAll('[data-card]').forEach(function (card) {
+			if (draft.get(card.getAttribute('data-card')) === null) { return; }
+			card.classList.add('has-draft');
+			card.setAttribute('data-draft-label', board.getAttribute('data-msg-draft') || '');
+		});
+
+		board.querySelectorAll('[data-foldable]').forEach(function (lane) {
+			var button = lane.querySelector('[data-fold]');
+			if (!button) { return; }
+			button.hidden = false;
+			fold(lane, remembered(lane) !== '0', false);
+			button.addEventListener('click', function () {
+				fold(lane, !lane.classList.contains('is-folded'), true);
 			});
 		});
+	})();
+
+	// --- The candidate inspector -------------------------------------------
+	// A card opens its own page in a panel over the board: every field, the
+	// whole note with room to write, and the actions. Without script, or if
+	// anything here fails, the link simply goes to that page.
+	(function inspector() {
+		if (!window.fetch) { return; }
+		var dialog = document.getElementById('inspektor');
+		if (dialog && (typeof dialog.showModal !== 'function' || !window.DOMParser)) { dialog = null; }
+		// The same page on its own, opened from a link or without the board.
+		var standalone = dialog ? null : document.querySelector('[data-inspector]');
+		if (!dialog && !standalone) { return; }
+		var slot = dialog ? dialog.querySelector('[data-inspector-slot]') : null;
+		var dirty = false;
+		var article = standalone;
+
+		var msg = function (name) { return article ? article.getAttribute('data-msg-' + name) || '' : ''; };
+		var grow = function (box) {
+			if (!box) { return; }
+			box.style.height = 'auto';
+			box.style.height = Math.min(box.scrollHeight + 2, window.innerHeight * 0.6) + 'px';
+		};
+		var mark = function (id) {
+			// The address says which card is open, so a reload reopens it.
+			var url = window.location.pathname + window.location.search + (id ? '#kort-' + id : '');
+			try { window.history.replaceState(null, '', url); } catch (e) { /* nothing to do */ }
+		};
+
+		var close = function (force) {
+			if (!force && dirty && !window.confirm(msg('discard'))) { return false; }
+			if (dirty && article) { draft.drop(article.getAttribute('data-id')); }
+			dirty = false;
+			dialog.close();
+			return true;
+		};
+
+		var wire = function () {
+			dirty = false;
+			var form = article.querySelector('[data-inspector-form]');
+			var id = article.getAttribute('data-id');
+			if (dialog) {
+				article.querySelectorAll('[data-inspector-close]').forEach(function (link) {
+					link.addEventListener('click', function (event) { event.preventDefault(); close(false); });
+				});
+			}
+			if (!form) { return; }
+			var note = form.querySelector('[data-draft]');
+			var status = form.querySelector('[data-status]');
+			var button = form.querySelector('button[type="submit"]');
+			var say = function (text, kind) {
+				status.textContent = text;
+				status.className = 'inspector-status' + (kind ? ' is-' + kind : '');
+			};
+
+			var kept = note ? draft.get(id) : null;
+			if (kept !== null) {
+				if (kept !== note.value) {
+					note.value = kept;
+					dirty = true;
+					say(msg('restored'), 'warn');
+				} else {
+					draft.drop(id);
+				}
+			}
+			grow(note);
+
+			form.addEventListener('input', function (event) {
+				dirty = true;
+				if (event.target === note) {
+					draft.set(id, note.value);
+					grow(note);
+				}
+			});
+			if (note) {
+				note.addEventListener('keydown', function (event) {
+					if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+						event.preventDefault();
+						if (form.requestSubmit) { form.requestSubmit(); } else { form.dispatchEvent(new Event('submit', { cancelable: true })); }
+					}
+				});
+			}
+
+			form.addEventListener('submit', function (event) {
+				event.preventDefault();
+				button.disabled = true;
+				say('…');
+				post(form.action, new URLSearchParams(new FormData(form))).then(function () {
+					draft.drop(id);
+					dirty = false;
+					say(msg('saved'), 'ok');
+					// The card's column, preview and counts all follow from
+					// what was saved; the page is the simplest way to show it.
+					if (dialog) {
+						mark('');
+						window.location.reload();
+					} else {
+						window.location.href = '/kandidater';
+					}
+				}).catch(function (err) {
+					button.disabled = false;
+					if (note) { draft.set(id, note.value); }
+					say(err && err.signedOut ? msg('signedout') : msg('failed'), 'error');
+					if (err && err.signedOut) {
+						var link = document.createElement('a');
+						link.href = '/login';
+						link.target = '_blank';
+						link.rel = 'noopener';
+						link.textContent = msg('signin');
+						status.appendChild(document.createTextNode(' '));
+						status.appendChild(link);
+					}
+				});
+			});
+		};
+
+		var open = function (href, id) {
+			fetch(href, { credentials: 'same-origin', redirect: 'manual' }).then(function (r) {
+				if (!r.ok) { throw new Error('status ' + r.status); }
+				return r.text();
+			}).then(function (html) {
+				var found = new DOMParser().parseFromString(html, 'text/html').querySelector('[data-inspector]');
+				if (!found) { throw new Error('no inspector'); }
+				slot.replaceChildren(document.importNode(found, true));
+				article = slot.querySelector('[data-inspector]');
+				wire();
+				if (!dialog.open) { dialog.showModal(); }
+				// Straight to the note for the team, at its end, ready to
+				// add to; anybody else starts at the top.
+				var note = article.querySelector('[data-draft]');
+				grow(note);
+				if (note) {
+					note.focus({ preventScroll: true });
+					note.setSelectionRange(note.value.length, note.value.length);
+				}
+				dialog.scrollTop = 0;
+				mark(id);
+			}).catch(function () { window.location.href = href; });
+		};
+
+		window.addEventListener('beforeunload', function (event) {
+			if (dirty) { event.preventDefault(); event.returnValue = ''; }
+		});
+		if (standalone) {
+			wire();
+			return;
+		}
+
+		document.addEventListener('click', function (event) {
+			var link = event.target.closest && event.target.closest('a[data-inspect]');
+			if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) { return; }
+			event.preventDefault();
+			var card = link.closest('[data-card]');
+			open(link.getAttribute('href'), card ? card.getAttribute('data-card') : '');
+		});
+
+		// Every way out asks first when something is unsaved: the ×, Escape,
+		// a click beside the panel and the cancel button.
+		dialog.querySelector('.sheet-close').addEventListener('submit', function (event) {
+			event.preventDefault();
+			close(false);
+		});
+		dialog.addEventListener('cancel', function (event) {
+			event.preventDefault();
+			close(false);
+		});
+		dialog.addEventListener('click', function (event) {
+			if (event.target === dialog) { close(false); }
+		});
+		dialog.addEventListener('close', function () {
+			slot.replaceChildren();
+			article = null;
+			mark('');
+		});
+		var wanted = /^#kort-([A-Za-z0-9_-]+)$/.exec(window.location.hash);
+		if (wanted) { open('/kandidater/' + wanted[1], wanted[1]); }
 	})();
 
 	// --- Close the account menu the way people expect ----------------------

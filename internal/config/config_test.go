@@ -278,11 +278,11 @@ func TestAccessMatrix(t *testing.T) {
 		{RoleCashier, PermAdd, true},
 		{RoleBoard, PermAdd, true},
 
-		// Only the cashier touches money. They are the one with the bank
-		// statement in front of them.
+		// The cashier touches money: they are the one with the bank
+		// statement in front of them. The board may step in.
 		{RoleIntake, PermPay, false},
 		{RoleCashier, PermPay, true},
-		{RoleBoard, PermPay, false},
+		{RoleBoard, PermPay, true},
 
 		// Changing somebody already in the register.
 		{RoleIntake, PermEdit, false},
@@ -304,6 +304,22 @@ func TestAccessMatrix(t *testing.T) {
 
 		{RoleIntake, PermSync, false},
 		{RoleBoard, PermSync, true},
+
+		// The candidate board is the interview team's. The cashier sees it
+		// without the team's notes and may mark somebody who paid as a
+		// friend member; the board may override all of it.
+		{RoleIntake, PermPipeline, true},
+		{RoleCashier, PermPipeline, true},
+		{RoleBoard, PermPipeline, true},
+		{RoleIntake, PermPipelineNotes, true},
+		{RoleCashier, PermPipelineNotes, false},
+		{RoleBoard, PermPipelineNotes, true},
+		{RoleIntake, PermPipelineWelcome, true},
+		{RoleCashier, PermPipelineWelcome, true},
+		{RoleBoard, PermPipelineWelcome, true},
+		{RoleIntake, PermPipelineEdit, true},
+		{RoleCashier, PermPipelineEdit, false},
+		{RoleBoard, PermPipelineEdit, true},
 
 		// Nobody who has not signed in may do anything at all.
 		{RoleNone, PermView, false},
@@ -336,15 +352,14 @@ func TestNeedsApprovalIsWhatSomebodyCannotDoOutright(t *testing.T) {
 	}
 }
 
-// The house asked for payments to be the cashier's alone, which is the
-// default. An association that wants the board to be able to fix a slip says
-// so with one environment variable, and this is that switch.
+// Payments are the cashier's by default. An association that wants the
+// interview team to record them too says so with one environment variable.
 func TestPaymentRolesCanBeWidened(t *testing.T) {
-	access := Access{PaymentRoles: map[Role]bool{RoleCashier: true, RoleBoard: true}}
-	if !access.May(RoleBoard, PermPay) {
-		t.Error("the board should be able to record a payment when configured to")
+	access := Access{PaymentRoles: map[Role]bool{RoleCashier: true, RoleIntake: true}}
+	if !access.May(RoleIntake, PermPay) {
+		t.Error("intake should be able to record a payment when configured to")
 	}
-	if access.May(RoleIntake, PermPay) {
-		t.Error("intake still should not")
+	if access.May(RoleCashier, PermApprove) {
+		t.Error("widening payments must not widen anything else")
 	}
 }

@@ -794,82 +794,78 @@ textarea:hover { border-color: var(--base-300); }
 	/* Let a lane's own scrollbar appear rather than growing the page. */
 	max-height: calc(100vh - 16rem); min-height: 20rem;
 }
+/* The live lanes share the width and the finished ones fold to a strip, so
+   the whole process fits on a laptop without scrolling sideways. */
 .lane {
-	flex: 0 0 21rem; display: flex; flex-direction: column;
+	flex: 1 1 15rem; min-width: 15rem; max-width: 24rem; display: flex; flex-direction: column;
 	max-height: 100%;
 	background: var(--bg-soft); border: 1px solid var(--line);
 	border-radius: var(--radius-lg); padding: .8rem;
 }
 .lane.is-closed { background: transparent; border-style: dashed; }
 .lane.is-over { border-color: var(--accent); background: var(--accent-soft); }
-.lane-head { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; margin-bottom: .7rem; }
+.lane-head { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .6rem; }
 .lane-head h2 { margin: 0; font-size: .95rem; }
+.lane-head .tag { margin-right: auto; }
+.lane-head { flex-wrap: wrap; }
+.lane-fold, .lane-clear .link-button { font-size: .78rem; white-space: nowrap; }
+/* A finished lane, folded: a narrow strip with its name and count that still
+   takes a dropped card. */
+.lane.is-folded { flex: 0 0 8rem; min-width: 8rem; padding: .7rem .6rem; }
+.lane.is-folded h2 { font-size: .85rem; }
+.lane.is-folded .lane-cards, .lane.is-folded .lane-clear { display: none; }
+.lane.is-folded .lane-head { flex-wrap: wrap; margin-bottom: 0; }
 .lane-cards {
 	list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem;
+	grid-template-columns: minmax(0, 1fr);
 	overflow-y: auto; min-height: 3rem; align-content: start;
 }
 
+/* A card is a few lines to scan and a handle to drag; the whole of it is a
+   link to the inspector, where the work is done. */
 .card-c {
 	background: var(--bg); border: 1px solid var(--line);
-	border-radius: var(--radius); padding: .6rem .7rem; font-size: .85rem;
-	cursor: grab;
+	border-radius: var(--radius); font-size: .83rem; line-height: 1.35;
+	transition: border-color .12s, box-shadow .12s;
 }
+.card-c[draggable="true"] { cursor: grab; }
+.card-c:hover { border-color: var(--accent); }
 .card-c.is-dragging { opacity: .4; cursor: grabbing; }
 .card-c.is-saving { border-color: var(--accent); }
-.card-top { display: flex; align-items: baseline; gap: .35rem; flex-wrap: wrap; margin-bottom: .45rem; }
-.card-top strong { font-weight: 600; }
-.grip { color: var(--text-faint); cursor: grab; font-size: .9rem; }
-
-.card-fields { margin: 0; display: grid; gap: .15rem; }
-.card-fields > div { display: flex; gap: .5rem; align-items: baseline; }
-.card-fields dt {
-	flex: 0 0 5.5rem; color: var(--text-faint); font-size: .7rem;
-	text-transform: uppercase; letter-spacing: .03em;
+.card-open {
+	display: grid; gap: .25rem; padding: .55rem .65rem;
+	color: inherit; text-decoration: none; border-radius: inherit;
 }
-.card-fields dd { margin: 0; min-width: 0; overflow-wrap: anywhere; flex: 1; }
-
-/* Anything you can click to change. Underlined faintly on hover so that it
-   reads as editable without shouting about it on every row. */
-[data-edit] {
-	cursor: text; border-radius: 3px; padding: 0 .15rem; margin: 0 -.15rem;
-	border-bottom: 1px dashed transparent;
+.card-open > * { min-width: 0; }
+.card-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.card-c[draggable="true"] .card-open { cursor: inherit; }
+.card-top { display: flex; align-items: baseline; gap: .35rem; }
+.card-name { font-weight: 600; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-top .chip { margin-left: auto; flex: 0 0 auto; }
+.card-c .k {
+	color: var(--text-faint); font-size: .68rem; text-transform: uppercase;
+	letter-spacing: .03em; margin-right: .15rem;
 }
-[data-edit]:hover { background: var(--bg-sunk); border-bottom-color: var(--line); }
-[data-edit].is-saved { background: var(--ok-bg); }
-[data-edit].is-failed { background: var(--danger-bg); }
-.inline-input {
-	width: 100%; min-height: 0; font: inherit; font-size: .85rem;
-	padding: .1rem .25rem; border: 1px solid var(--accent); border-radius: 3px;
-	background: var(--bg); color: var(--text);
+.card-meta { display: flex; flex-wrap: wrap; gap: 0 .75rem; color: var(--text-muted); font-size: .78rem; }
+.card-meta .kv { white-space: nowrap; }
+.card-reason {
+	margin: 0; font-size: .74rem; color: var(--info-text);
+	background: var(--info-bg); border-radius: var(--radius-sm);
+	padding: .05rem .4rem; justify-self: start;
 }
-/* The note is where an interview gets written up, so it keeps its line
-   breaks, and while it is being written it gets the whole card's width
-   below its label instead of a sliver beside it. */
+/* Two lines of the note, or of what they wrote; the rest is one click away. */
+.card-preview {
+	display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+	overflow: hidden; color: var(--text-muted); font-size: .78rem; white-space: pre-line;
+}
+.card-preview.is-said { font-style: italic; }
+.card-c.has-draft { border-color: var(--danger-text); }
+.card-c.has-draft::after {
+	content: attr(data-draft-label); display: block; padding: 0 .65rem .45rem;
+	font-size: .72rem; color: var(--danger-text);
+}
 .card-note { white-space: pre-wrap; }
-.card-fields > div.is-writing { flex-direction: column; align-items: stretch; gap: .2rem; }
-.card-fields > div.is-writing dt { flex: none; }
-textarea.inline-input {
-	display: block; min-height: 7rem; max-height: 60vh; padding: .4rem .5rem;
-	line-height: 1.45; resize: vertical; white-space: pre-wrap; overflow-y: auto;
-}
-.inline-status { display: block; margin-top: .25rem; font-size: .72rem; color: var(--text-faint); white-space: normal; }
-[data-edit].is-failed .inline-status { color: var(--danger-text); }
-[data-edit].is-failed:has(textarea) { background: none; }
-[data-edit].has-draft::after {
-	content: attr(data-draft-label); display: block; margin-top: .15rem;
-	font-size: .72rem; color: var(--danger-text); white-space: normal;
-}
-.card-said {
-	margin: .5rem 0 0; padding: .35rem .5rem; font-size: .8rem; font-style: italic;
-	color: var(--text-muted); background: var(--bg-sunk); border-radius: var(--radius-sm);
-}
-.card-foot {
-	display: flex; align-items: center; justify-content: space-between;
-	gap: .5rem; margin-top: .55rem; padding-top: .5rem;
-	border-top: 1px solid var(--line-soft); flex-wrap: wrap;
-}
-.move-form select { min-height: 0; padding: .15rem 1.6rem .15rem .35rem; font-size: .78rem; }
-.card-foot .link-button { font-size: .8rem; }
+
 /* Deleting is offered quietly: it is ordinary tidying for the team that owns
    the board, not a warning, so it stays a plain link until you reach for it. */
 .quiet-danger { color: var(--text-faint); }
@@ -893,6 +889,57 @@ textarea.inline-input {
 	color: var(--text-faint); cursor: pointer; padding: .2rem .5rem;
 }
 .sheet-close button:hover { color: var(--text); }
+
+/* ---------- The candidate inspector ---------- */
+/* A panel down the right-hand side, over the board, so the board stays in
+   view; the whole screen on a phone, where there is no room for both. */
+.inspector-sheet {
+	margin: 0 0 0 auto; height: 100dvh; max-height: 100dvh; width: min(36rem, 100%);
+	max-width: 100%; border-radius: 0; border-width: 0 0 0 1px;
+	padding: 1.25rem 1.5rem 1.5rem; overflow-y: auto;
+}
+.inspector-sheet[open] { animation: inspector-in .16s ease-out; }
+@keyframes inspector-in { from { transform: translateX(1.5rem); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .inspector-sheet[open] { animation: none; } }
+.inspector-sheet .sheet-close { position: sticky; top: 0; z-index: 1; margin: -.5rem -.75rem -1.5rem 0; }
+.inspector { display: grid; gap: 1.25rem; }
+.inspector-head { display: grid; gap: .2rem; justify-items: start; }
+.inspector-stage {
+	margin: 0; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em;
+	color: var(--accent-strong); font-weight: 600;
+}
+.inspector-name { margin: 0; font-size: 1.6rem; line-height: 1.2; padding-right: 2rem; }
+.inspector-trail { margin: .2rem 0 0; font-size: .8rem; color: var(--text-faint); }
+.inspector h2 {
+	margin: 0 0 .4rem; font-size: .75rem; text-transform: uppercase;
+	letter-spacing: .05em; color: var(--text-faint); font-weight: 600;
+}
+.inspector-own { display: grid; gap: .45rem; padding: .8rem .9rem; background: var(--bg-sunk); border-radius: var(--radius); }
+.inspector-own h2 { margin: 0; }
+.inspector-said { margin: 0; white-space: pre-wrap; font-style: italic; color: var(--text-muted); }
+.inspector-form { display: grid; gap: 1rem; }
+.inspector-form .field-grid { margin: 0; }
+.inspector-form textarea { min-height: 10rem; line-height: 1.5; resize: vertical; }
+.inspector-status { margin: 0; font-size: .85rem; color: var(--text-muted); min-height: 1.2em; }
+.inspector-status:empty { display: none; }
+.inspector-status.is-ok { color: var(--ok-text, var(--text-muted)); }
+.inspector-status.is-warn { color: var(--warn-text, var(--text)); }
+.inspector-status.is-error { color: var(--danger-text); }
+.inspector-save { margin: 0; position: sticky; bottom: -1.5rem; background: var(--bg-soft); padding: .75rem 0 1.5rem; }
+.inspector-facts { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: .4rem 1rem; }
+.inspector-facts > div { display: contents; }
+.inspector-facts dt { color: var(--text-faint); font-size: .8rem; }
+.inspector-facts dd { margin: 0; overflow-wrap: anywhere; }
+.inspector-facts .is-wide dt, .inspector-facts .is-wide dd { grid-column: 1 / -1; }
+.inspector-actions {
+	display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+	padding-top: 1rem; border-top: 1px solid var(--line-soft);
+}
+.inspector-delete { margin-left: auto; }
+@media (max-width: 40rem) {
+	.inspector-sheet { width: 100%; border-width: 0; padding: 1rem 1rem 1.25rem; }
+	.inspector-name { font-size: 1.35rem; }
+}
 
 .proposal.is-settled { opacity: .65; }
 

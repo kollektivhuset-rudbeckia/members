@@ -176,8 +176,8 @@ func TestPermissionsAreEnforcedByTheRouter(t *testing.T) {
 	}{
 		{"intake may not record a payment", config.RoleIntake, "POST",
 			"/medlem/m1/betalning", url.Values{"ar": {"2026"}}, http.StatusForbidden},
-		{"the board may not record a payment either", config.RoleBoard, "POST",
-			"/medlem/m1/betalning", url.Values{"ar": {"2026"}}, http.StatusForbidden},
+		{"the board may step in and record one", config.RoleBoard, "POST",
+			"/medlem/m1/betalning", url.Values{"ar": {"2026"}}, http.StatusSeeOther},
 		{"the cashier may", config.RoleCashier, "POST",
 			"/medlem/m1/betalning", url.Values{"ar": {"2026"}}, http.StatusSeeOther},
 

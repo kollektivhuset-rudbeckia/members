@@ -240,25 +240,32 @@ släpps in — oavsett Google-domän.
 | Lägga till en medlem | ✓ | ✓ | ✓ |
 | Ändra en befintlig | förslag | ✓ | ✓ |
 | Ta bort någon | förslag | förslag | ✓ |
-| Pricka av en avgift | – | ✓ | – |
+| Pricka av en avgift | – | ✓ | (✓) |
 | Ta ställning till förslag | – | – | ✓ |
 | Synkronisera för hand | – | – | ✓ |
 | Läsa loggen | – | – | ✓ |
 | Se kandidattavlan | ✓ | ✓ | ✓ |
 | Se intervjugruppens anteckningar | ✓ | – | ✓ |
-| Göra en kandidat till vänmedlem | ✓ | ✓ | – |
-| Arbeta i kandidattavlan | ✓ | – | – |
+| Markera en kandidat som vänmedlem | ✓ | ✓ | (✓) |
+| Arbeta i kandidattavlan | ✓ | – | (✓) |
+
+**(✓) Styrelsen får allt.** Att pricka av avgifter och att sköta
+kandidattavlan är andras jobb, och styrelsen ska inte göra det i vardagen.
+Men styrelsen ansvarar för föreningen och måste kunna gå in och rätta något
+utan att först be om en behörighet den borde ha haft.
 
 **Kandidattavlan är intervjugruppens.** Att se den och att arbeta i den är
 två olika rättigheter. Processen, anteckningarna och bedömningen av vem som
-står var är `ny@`s, och styrelsen är välkommen att titta — men att någon annan
-flyttar en person ut ur *Bokad intervju* är just den förvirring uppdelningen
-finns för att förhindra.
+står var är `ny@`s — att någon annan flyttar en person ut ur *Bokad
+intervju* är just den förvirring uppdelningen finns för att förhindra.
+Styrelsen kan, men gör det bara för att rätta något.
 
 **Kassören ser tavlan, men inte anteckningarna.** Den som betalar avgiften
 direkt från formuläret syns på `ekonomi@`s kontoutdrag innan intervjugruppen
-hunnit höra av sig, och kassören behöver kunna hitta personen och göra hen
-till vänmedlem. Det är det enda kassören kan göra på tavlan. Anteckningen och
+hunnit höra av sig, och kassören behöver kunna hitta personen och markera hen
+som vänmedlem. Det är det enda kassören kan göra på tavlan, och kortet
+**flyttas inte**: personen skrivs in i registret och kortet får en etikett,
+men var kortet står är fortfarande intervjugruppens sak. Anteckningen och
 vem som är ansvarig visas inte — de är intervjugruppens bedömning av folk som
 föreningen ännu inte sagt ja till — och de skickas inte ens med till sidan.
 Det sökande själva skrev står kvar.
@@ -287,9 +294,9 @@ Två saker som är värda att veta om förslag:
   **inaktuellt** i stället för godkännbart. Att godkänna det skulle tysta
   skriva över deras arbete.
 
-**Bara ekonomi prickar av avgifter.** De är de som har bankkontot framför sig,
+**Ekonomi prickar av avgifter.** De är de som har bankkontot framför sig,
 och en betalning som någon annan bockat av är ett tal ingen kan gå i god för.
-Vill styrelsen kunna rätta en felprickning: `PAYMENT_ROLES=cashier,board`.
+Styrelsen kan rätta en felprickning, men prickar inte av i vardagen.
 
 ---
 
@@ -497,7 +504,7 @@ Allt hemligt sätts som miljövariabler, aldrig i `config.yaml`. Se
 | `ACCOUNT_INTAKE` | `ny@rudbeckia.nu` | Kontot som får lägga till men inte ändra |
 | `ACCOUNT_CASHIER` | `ekonomi@rudbeckia.nu` | Kontot som prickar av avgifter |
 | `ACCOUNT_BOARD` | `styrelsen@rudbeckia.nu` | Kontot som får allt, och godkänner förslag |
-| `PAYMENT_ROLES` | `cashier` | Roller som får pricka av. `cashier,board` för båda |
+| `PAYMENT_ROLES` | `cashier` | Roller utöver styrelsen som får pricka av |
 | `SESSION_SECRET` | slumpas | Signerar sessionskakor. Tom = alla loggas ut vid deploy |
 | `SESSION_HOURS` | `12` | Hur länge en inloggning håller |
 | `CONFIG_PATH` | `/config.yaml` | Var föreningsfilen ligger |
