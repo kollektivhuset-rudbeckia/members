@@ -32,7 +32,6 @@ func TestOnlyTheInterviewTeamMayWorkTheBoard(t *testing.T) {
 				{"move a card", "POST", "/kandidater/" + id, url.Values{"steg": {"limbo"}}},
 				{"edit a field", "POST", "/kandidater/" + id + "/falt",
 					url.Values{"falt": {"ansvarig"}, "varde": {"Någon"}}},
-				{"welcome somebody", "POST", "/kandidater/" + id + "/valkomna", url.Values{}},
 				{"delete a card", "POST", "/kandidater/" + id + "/ta-bort", url.Values{}},
 				{"clear a column", "POST", "/kandidater/rensa", url.Values{"steg": {"welcomed"}}},
 				{"add a card", "POST", "/kandidater/ny", url.Values{"fornamn": {"Ny"}}},
@@ -56,8 +55,8 @@ func TestOnlyTheInterviewTeamMayWorkTheBoard(t *testing.T) {
 	}
 }
 
-// Seeing it is a different matter: the board may read the pipeline, and the
-// cashier has no business in it at all.
+// Seeing it is a different matter: everybody signed in may read the board,
+// the cashier without the team's notes.
 func TestWhoMayLookAtTheBoard(t *testing.T) {
 	h := newHarness(t)
 	for _, tc := range []struct {
@@ -66,7 +65,7 @@ func TestWhoMayLookAtTheBoard(t *testing.T) {
 	}{
 		{config.RoleIntake, http.StatusOK},
 		{config.RoleBoard, http.StatusOK},
-		{config.RoleCashier, http.StatusForbidden},
+		{config.RoleCashier, http.StatusOK},
 	} {
 		if rec := h.do(t, tc.role, "GET", "/kandidater", nil); rec.Code != tc.want {
 			t.Errorf("%s reading the board: got %d, want %d", tc.role, rec.Code, tc.want)
@@ -273,5 +272,61 @@ func TestTheNoteHoldsAWholeInterview(t *testing.T) {
 		url.Values{"falt": {"telefon"}, "varde": {strings.Repeat("1", 501)}, "tyst": {"1"}})
 	if rec.Code != http.StatusRequestEntityTooLarge {
 		t.Errorf("a 501-character phone number: got %d, want 413", rec.Code)
+	}
+}
+
+// Making somebody a friend member is the one thing on the board that is not
+// only the interview team's: the board itself decides proposals, it does not
+// welcome people.
+func TestTheBoardMayNotWelcomeAnybody(t *testing.T) {
+	h := newHarness(t)
+	id := h.candidate(t, "Bo", "bo@example.test", "new")
+	if rec := h.do(t, config.RoleBoard, "POST", "/kandidater/"+id+"/valkomna", url.Values{}); rec.Code != http.StatusForbidden {
+		t.Errorf("the board welcoming somebody: got %d, want 403", rec.Code)
+	}
+}
+
+// The cashier is the one with the bank statement open, so somebody who paid
+// the fee straight from the join form is the cashier's to make a friend
+// member. The interview team's notes about them are not the cashier's to read.
+func TestTheCashierMakesAFriendMemberWithoutSeeingTheNotes(t *testing.T) {
+	h := newHarness(t)
+	id := h.candidate(t, "Per", "per@example.test", "new")
+	const note = "intervjugruppens egen bedömning"
+	const responsible = "gunilla-ansvarar"
+	for field, value := range map[string]string{"anteckning": note, "ansvarig": responsible} {
+		rec := h.do(t, config.RoleIntake, "POST", "/kandidater/"+id+"/falt",
+			url.Values{"falt": {field}, "varde": {value}, "tyst": {"1"}})
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("setting %s: got %d", field, rec.Code)
+		}
+	}
+
+	body := h.do(t, config.RoleCashier, "GET", "/kandidater", nil).Body.String()
+	for _, unwanted := range []string{note, responsible, "/ta-bort", "/kandidater/rensa", "data-edit=", "data-board"} {
+		if strings.Contains(body, unwanted) {
+			t.Errorf("the cashier's board shows %q", unwanted)
+		}
+	}
+	if !strings.Contains(body, "/kandidater/"+id+"/valkomna") {
+		t.Error("the cashier's board has no way to make the candidate a friend member")
+	}
+	// The team and the board still read them.
+	for _, role := range []config.Role{config.RoleIntake, config.RoleBoard} {
+		if body := h.do(t, role, "GET", "/kandidater", nil).Body.String(); !strings.Contains(body, note) {
+			t.Errorf("%s no longer sees the team's note", role)
+		}
+	}
+
+	rec := h.do(t, config.RoleCashier, "POST", "/kandidater/"+id+"/valkomna", url.Values{})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("the cashier welcoming: got %d, want a redirect", rec.Code)
+	}
+	m, err := h.store.MemberByEmail(context.Background(), "per@example.test", h.cfg.Location())
+	if err != nil {
+		t.Fatalf("welcoming did not make a member: %v", err)
+	}
+	if m.Kind != config.KindVan {
+		t.Errorf("welcomed as %q, want a friend member", m.Kind)
 	}
 }

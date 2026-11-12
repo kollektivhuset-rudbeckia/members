@@ -463,6 +463,7 @@ var catalog = map[string]entry{
 	"pipeline.note.draft":      {"Osparat utkast – klicka för att fortsätta", "Unsaved draft – click to continue"},
 	"pipeline.note.discard":    {"Släng det du skrivit i anteckningen?", "Throw away what you wrote in the note?"},
 	"pipeline.readonly.why":    {"Tavlan sköts av intervjugruppen (ny@). Styrelsen och kassören ser den men ändrar inte i den.", "The board is run by the interview team (ny@). The board and the treasurer can see it but do not change it."},
+	"pipeline.cashier.why":     {"Tavlan sköts av intervjugruppen (ny@). Som kassör kan du göra den som betalat till vänmedlem; intervjugruppens anteckningar visas inte här.", "The board is run by the interview team (ny@). As treasurer you can make somebody who has paid a friend member; the interview team's notes are not shown here."},
 	"pipeline.ismember":        {"Redan medlem", "Already a member"},
 	"pipeline.already":         {"%s finns redan i registret.", "%s is already in the register."},
 	"pipeline.noemail":         {"Utan e-postadress går det inte att göra någon till medlem — adressen är det gruppen bygger på.", "Without an e-mail address nobody can be made a member: the address is what the group is built on."},

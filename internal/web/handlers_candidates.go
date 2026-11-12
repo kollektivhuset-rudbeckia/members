@@ -16,9 +16,10 @@ import (
 )
 
 // The pipeline is the interview team's own working board, and it is theirs:
-// ny@ and the board see it, nobody else. It carries what people said about
-// themselves before the association agreed to anything, which is not the
-// cashier's business.
+// ny@ works it and the board reads it. The cashier sees it too, so that
+// somebody who has paid can be made a friend member, but not the team's
+// notes about people the association has not agreed to anything with yet —
+// that is not the cashier's business.
 
 // column is one stage with the people in it.
 type column struct {
@@ -49,8 +50,16 @@ func (s *Server) handleCandidates(w http.ResponseWriter, r *http.Request, v *vie
 		return
 	}
 
+	// The team's notes are left out of what the page is given at all for
+	// anybody who may not read them, rather than only hidden by the
+	// template, so that a template change cannot leak them.
+	notes := v.May(string(config.PermPipelineNotes))
+
 	byStage := map[string][]candidateView{}
 	for _, c := range list {
+		if !notes {
+			c.Note, c.Responsible = "", ""
+		}
 		cv := candidateView{Candidate: c, Reason: s.reasonWords(c, string(v.Lang))}
 		if c.Email != "" {
 			if m, err := s.store.MemberByEmail(r.Context(), c.Email, v.Loc); err == nil {

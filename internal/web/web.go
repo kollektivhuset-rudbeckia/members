@@ -167,7 +167,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /kandidater/ny", s.can(config.PermPipelineEdit, s.handleAddCandidate))
 	mux.Handle("POST /kandidater/{id}/falt", s.can(config.PermPipelineEdit, s.handleCandidateField))
 	mux.Handle("POST /kandidater/{id}", s.can(config.PermPipelineEdit, s.handleSaveCandidate))
-	mux.Handle("POST /kandidater/{id}/valkomna", s.can(config.PermPipelineEdit, s.handleWelcomeCandidate))
+	mux.Handle("POST /kandidater/{id}/valkomna", s.can(config.PermPipelineWelcome, s.handleWelcomeCandidate))
 	mux.Handle("POST /kandidater/{id}/ta-bort", s.can(config.PermPipelineEdit, s.handleDeleteCandidate))
 	mux.Handle("POST /kandidater/rensa", s.can(config.PermPipelineEdit, s.handleClearStage))
 

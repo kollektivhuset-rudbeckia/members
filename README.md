@@ -244,16 +244,24 @@ släpps in — oavsett Google-domän.
 | Ta ställning till förslag | – | – | ✓ |
 | Synkronisera för hand | – | – | ✓ |
 | Läsa loggen | – | – | ✓ |
-| Se kandidattavlan | ✓ | – | ✓ |
+| Se kandidattavlan | ✓ | ✓ | ✓ |
+| Se intervjugruppens anteckningar | ✓ | – | ✓ |
+| Göra en kandidat till vänmedlem | ✓ | ✓ | – |
 | Arbeta i kandidattavlan | ✓ | – | – |
 
 **Kandidattavlan är intervjugruppens.** Att se den och att arbeta i den är
 två olika rättigheter. Processen, anteckningarna och bedömningen av vem som
 står var är `ny@`s, och styrelsen är välkommen att titta — men att någon annan
 flyttar en person ut ur *Bokad intervju* är just den förvirring uppdelningen
-finns för att förhindra. Kassören har ingen anledning att läsa den alls: den
-innehåller vad folk berättat om sig själva innan föreningen sagt ja till
-något.
+finns för att förhindra.
+
+**Kassören ser tavlan, men inte anteckningarna.** Den som betalar avgiften
+direkt från formuläret syns på `ekonomi@`s kontoutdrag innan intervjugruppen
+hunnit höra av sig, och kassören behöver kunna hitta personen och göra hen
+till vänmedlem. Det är det enda kassören kan göra på tavlan. Anteckningen och
+vem som är ansvarig visas inte — de är intervjugruppens bedömning av folk som
+föreningen ännu inte sagt ja till — och de skickas inte ens med till sidan.
+Det sökande själva skrev står kvar.
 
 **Att rensa en spalt går bara på *Välkomnade* och *Tackat nej*.** De är
 historik, och korten växer annars i all evighet. En öppen spalt kan inte

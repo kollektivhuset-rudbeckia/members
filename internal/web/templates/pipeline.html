@@ -3,6 +3,11 @@
      owns the pipeline; the board is welcome to look. Computed once so that a
      control and the route behind it cannot drift apart. */}}
 {{$edit := .May "pipeline.edit"}}
+{{/* The team's own notes, and who looks after a candidate, are for the team
+     and the board. The cashier sees the cards and may make somebody a friend
+     member — somebody who has paid — and nothing else. */}}
+{{$notes := .May "pipeline.notes"}}
+{{$welcome := .May "pipeline.welcome"}}
 
 <div class="hero hero-row">
 	<div>
@@ -16,7 +21,7 @@
 		     down and coming back to a lost scroll position is a small misery
 		     repeated all afternoon. */}}
 		<a class="button primary" href="/kandidater/ny" data-open-dialog="#ny-kandidat">{{t "pipeline.add"}}</a>
-		{{else}}
+		{{else if not $welcome}}
 		<span class="tag" title="{{t "pipeline.readonly.why"}}">{{t "pipeline.readonly"}}</span>
 		{{end}}
 	</div>
@@ -65,14 +70,14 @@
 					<div><dt>{{t "pipeline.interview"}}</dt>
 						<dd {{if $edit}}data-edit="intervju" data-id="{{$c.ID}}" data-type="date"
 						    data-raw="{{if $c.InterviewOn.Valid}}{{isoDate (local $c.InterviewOn.Time)}}{{end}}"{{end}}>{{if $c.InterviewOn.Valid}}{{dateShort (local $c.InterviewOn.Time)}}{{else}}—{{end}}</dd></div>
-					<div><dt>{{t "pipeline.responsible"}}</dt>
-						<dd {{if $edit}}data-edit="ansvarig" data-id="{{$c.ID}}"{{end}}>{{with $c.Responsible}}{{.}}{{else}}—{{end}}</dd></div>
+					{{if $notes}}<div><dt>{{t "pipeline.responsible"}}</dt>
+						<dd {{if $edit}}data-edit="ansvarig" data-id="{{$c.ID}}"{{end}}>{{with $c.Responsible}}{{.}}{{else}}—{{end}}</dd></div>{{end}}
 					<div><dt>{{t "form.email"}}</dt>
 						<dd {{if $edit}}data-edit="epost" data-id="{{$c.ID}}" data-type="email"{{end}}>{{with $c.Email}}{{.}}{{else}}—{{end}}</dd></div>
 					<div><dt>{{t "form.phone"}}</dt>
 						<dd {{if $edit}}data-edit="telefon" data-id="{{$c.ID}}" data-type="tel"{{end}}>{{with $c.Phone}}{{.}}{{else}}—{{end}}</dd></div>
-					<div><dt>{{t "form.note"}}</dt>
-						<dd class="card-note" {{if $edit}}data-edit="anteckning" data-id="{{$c.ID}}" data-type="multiline" data-max="5000" data-label="{{t "form.note"}}"{{end}}>{{with $c.Note}}{{.}}{{else}}—{{end}}</dd></div>
+					{{if $notes}}<div><dt>{{t "form.note"}}</dt>
+						<dd class="card-note" {{if $edit}}data-edit="anteckning" data-id="{{$c.ID}}" data-type="multiline" data-max="5000" data-label="{{t "form.note"}}"{{end}}>{{with $c.Note}}{{.}}{{else}}—{{end}}</dd></div>{{end}}
 					{{/* What the applicant said themselves, so not editable:
 					     correcting somebody's own answer would lose it. */}}
 					{{with .Reason}}<div><dt>{{t "join.why.short"}}</dt><dd>{{.}}</dd></div>{{end}}
@@ -112,6 +117,13 @@
 						<button type="submit" class="link-button quiet-danger">{{t "pipeline.delete"}}</button>
 					</form>
 				</footer>
+				{{else if and $welcome $c.Email (not .Known)}}
+				<footer class="card-foot">
+					<form method="post" action="/kandidater/{{$c.ID}}/valkomna" class="inline"
+					      data-confirm="{{t "pipeline.welcome.confirm" $c.Name}}">
+						<button type="submit" class="link-button">{{t "pipeline.welcome"}}</button>
+					</form>
+				</footer>
 				{{else if .Known}}
 				<footer class="card-foot">
 					<a class="quiet-link small" href="/medlem/{{.Member.ID}}">{{t "applications.already.see"}}</a>
@@ -125,7 +137,7 @@
 </div>
 
 <p class="hint board-hint">
-	{{if $edit}}{{t "pipeline.howto"}}{{else}}{{t "pipeline.readonly.why"}}{{end}}
+	{{if $edit}}{{t "pipeline.howto"}}{{else if $welcome}}{{t "pipeline.cashier.why"}}{{else}}{{t "pipeline.readonly.why"}}{{end}}
 	· {{t "pipeline.publicform"}} <a href="/bli-medlem">{{.Data.JoinURL}}</a>
 	{{if $edit}}<br>{{t "pipeline.clear.why"}}{{end}}
 </p>

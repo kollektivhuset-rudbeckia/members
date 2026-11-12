@@ -77,14 +77,28 @@ const (
 	PermPay Permission = "pay"
 	// PermSync starts a reconciliation by hand.
 	PermSync Permission = "sync"
-	// PermPipeline sees and works the candidate board.
+	// PermPipeline sees the candidate board: who has written in, where they
+	// are in the process, and what they said about themselves.
 	//
-	// It is the interview team's own working notes about people who have not
-	// agreed to anything yet — what they said about themselves, who is
-	// looking after them, whether they were turned down. That is ny@'s
-	// business and the board's, and nobody else's; the cashier has no reason
-	// to read it and every reason not to have to.
+	// The cashier has it too, because somebody who pays the fee straight
+	// from the join form shows up on ekonomi@'s bank statement before the
+	// interview team has got round to them, and the cashier needs to find
+	// that person and make them a friend member (PermPipelineWelcome).
 	PermPipeline Permission = "pipeline"
+	// PermPipelineNotes sees the interview team's own working notes on the
+	// board: the note on each card and who is looking after the candidate.
+	//
+	// Those are ny@'s judgement about people who have not agreed to anything
+	// yet. That is ny@'s business and the board's, and nobody else's; the
+	// cashier has no reason to read it and every reason not to have to.
+	PermPipelineNotes Permission = "pipeline.notes"
+	// PermPipelineWelcome makes a candidate a friend member.
+	//
+	// The interview team does this when they have said yes to somebody; the
+	// cashier does it when somebody has paid the fee. It is the one thing on
+	// the board the cashier may do: moving, editing and throwing cards away
+	// stay with the team that is answerable for the columns.
+	PermPipelineWelcome Permission = "pipeline.welcome"
 	// PermPipelineEdit works the candidate board: moves cards between
 	// columns, edits them, welcomes somebody, throws a card away.
 	//
@@ -110,7 +124,9 @@ const (
 //	fee paid or not    ✗         ✓          ✗ (see PaymentRoles)
 //	decide proposals   ✗         ✗          ✓
 //	sync by hand       ✗         ✗          ✓
-//	see the candidates ✓         ✗          ✓
+//	see the candidates ✓         ✓          ✓
+//	see the team notes ✓         ✗          ✓
+//	make vänmedlem     ✓         ✓          ✗
 //	work the board     ✓         ✗          ✗
 type Access struct {
 	// PaymentRoles are the roles that may touch a payment. The house asked
@@ -133,7 +149,11 @@ func (a Access) May(r Role, p Permission) bool {
 	case PermEdit:
 		return r == RoleBoard || r == RoleCashier
 	case PermPipeline:
+		return true
+	case PermPipelineNotes:
 		return r == RoleIntake || r == RoleBoard
+	case PermPipelineWelcome:
+		return r == RoleIntake || r == RoleCashier
 	case PermPipelineEdit:
 		return r == RoleIntake
 	case PermDelete, PermApprove, PermSync:
