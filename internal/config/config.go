@@ -781,8 +781,8 @@ func (c *Config) normalise() error {
 		c.Pipeline.Stages = []Stage{
 			{ID: "new", Name: "Nya", NameEN: "New", Entry: true},
 			{ID: "interview", Name: "Bokad intervju", NameEN: "Interview booked"},
-			{ID: "limbo", Name: "Limbo", NameEN: "Limbo"},
 			{ID: "welcomed", Name: "Välkomnade", NameEN: "Welcomed", Closed: true},
+			{ID: "limbo", Name: "Limbo", NameEN: "Limbo"},
 			{ID: "rejected", Name: "Tackat nej", NameEN: "Declined", Closed: true},
 		}
 	}
